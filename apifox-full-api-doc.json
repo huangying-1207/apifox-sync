@@ -1,0 +1,334 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "UserController.java"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "查询数据",
+        "deprecated": false,
+        "description": "查询数据",
+        "tags": [
+          "UserController.java"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serviceType",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "description": "响应代码"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "响应信息"
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "响应数据",
+                      "x-apifox-orders": [],
+                      "properties": {},
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "x-apifox-orders": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apifox-name": "成功",
+            "x-apifox-ordering": 0
+          }
+        },
+        "security": [],
+        "x-apifox-folder": "UserController.java",
+        "x-apifox-status": "released",
+        "x-run-in-apifox": "https://app.apifox.com/web/project/8216636/apis/api-452816527-run"
+      },
+      "post": {
+        "summary": "新增数据",
+        "deprecated": false,
+        "description": "新增数据",
+        "tags": [
+          "UserController.java"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "description": "响应代码"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "响应信息"
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "响应数据",
+                      "x-apifox-orders": [],
+                      "properties": {},
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "x-apifox-orders": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apifox-name": "成功",
+            "x-apifox-ordering": 0
+          }
+        },
+        "security": [],
+        "x-apifox-folder": "UserController.java",
+        "x-apifox-status": "released",
+        "x-run-in-apifox": "https://app.apifox.com/web/project/8216636/apis/api-452816528-run"
+      }
+    },
+    "/{id}": {
+      "get": {
+        "summary": "查询数据",
+        "deprecated": false,
+        "description": "查询数据",
+        "tags": [
+          "UserController.java"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "description": "响应代码"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "响应信息"
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "响应数据",
+                      "x-apifox-orders": [],
+                      "properties": {},
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "x-apifox-orders": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apifox-name": "成功",
+            "x-apifox-ordering": 0
+          }
+        },
+        "security": [],
+        "x-apifox-folder": "UserController.java",
+        "x-apifox-status": "released",
+        "x-run-in-apifox": "https://app.apifox.com/web/project/8216636/apis/api-452816529-run"
+      },
+      "put": {
+        "summary": "更新数据",
+        "deprecated": false,
+        "description": "更新数据",
+        "tags": [
+          "UserController.java"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "description": "响应代码"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "响应信息"
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "响应数据",
+                      "x-apifox-orders": [],
+                      "properties": {},
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "x-apifox-orders": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apifox-name": "成功",
+            "x-apifox-ordering": 0
+          }
+        },
+        "security": [],
+        "x-apifox-folder": "UserController.java",
+        "x-apifox-status": "released",
+        "x-run-in-apifox": "https://app.apifox.com/web/project/8216636/apis/api-452816530-run"
+      },
+      "delete": {
+        "summary": "删除数据",
+        "deprecated": false,
+        "description": "删除数据",
+        "tags": [
+          "UserController.java"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "description": "响应代码"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "响应信息"
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "响应数据",
+                      "x-apifox-orders": [],
+                      "properties": {},
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "x-apifox-orders": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apifox-name": "成功",
+            "x-apifox-ordering": 0
+          }
+        },
+        "security": [],
+        "x-apifox-folder": "UserController.java",
+        "x-apifox-status": "released",
+        "x-run-in-apifox": "https://app.apifox.com/web/project/8216636/apis/api-452816531-run"
+      }
+    }
+  },
+  "webhooks": {},
+  "components": {
+    "schemas": {},
+    "responses": {},
+    "securitySchemes": {}
+  },
+  "servers": [],
+  "security": []
+}

@@ -1,0 +1,26 @@
+{
+  "name": "api-sync-to-apifox",
+  "version": "1.2.0",
+  "description": "Apifox 接口同步工具 - 自动同步后端接口到 Apifox 项目，支持增量同步和全量更新",
+  "main": "src/index.js",
+  "bin": {
+    "api-sync-to-apifox": "src/index.js"
+  },
+  "scripts": {
+    "test": "node src/index.js help",
+    "start": "node src/index.js",
+    "init": "node src/index.js config init",
+    "scan": "node src/index.js scan",
+    "sync": "node src/index.js sync",
+    "config": "node src/index.js config"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "yaml": "^2.3.0",
+    "js-yaml": "^4.1.0",
+    "glob": "^10.3.0"
+  },
+  "keywords": ["apifox", "sync", "api"],
+  "author": "Claude",
+  "license": "MIT"
+}

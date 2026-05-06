@@ -1,0 +1,185 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "自动生成的 API 文档",
+    "version": "1.0.0",
+    "description": "根据代码自动解析生成的 API 接口文档"
+  },
+  "paths": {
+    "/api/users/": {
+      "get": {
+        "summary": "查询users",
+        "description": "查询users",
+        "tags": [
+          "UserController.java"
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "description": "Code字段"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Message字段"
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "Data字段"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "新增users",
+        "description": "新增users",
+        "tags": [
+          "UserController.java"
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "description": "Code字段"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Message字段"
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "Data字段"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{id}/{type}": {
+      "get": {
+        "summary": "查询users",
+        "description": "查询users",
+        "tags": [
+          "UserController.java"
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "description": "Code字段"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Message字段"
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "Data字段"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "put": {
+        "summary": "更新users",
+        "description": "更新users",
+        "tags": [
+          "UserController.java"
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "description": "Code字段"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Message字段"
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "Data字段"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "删除users",
+        "description": "删除users",
+        "tags": [
+          "UserController.java"
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "description": "Code字段"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Message字段"
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "Data字段"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {},
+    "parameters": {}
+  }
+}

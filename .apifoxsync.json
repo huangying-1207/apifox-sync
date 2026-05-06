@@ -1,0 +1,10 @@
+{
+  "apifox-project-id": "8216636",
+  "apifox-api-key": "afxp_b1f13cirg7pkYgT4N6YtaBZLsZ5eVVKXR13e",
+  "source-type": "code",
+  "source-path": "D:\\IDEA\\simple-spring-boot\\src\\main\\java\\com\\example\\controller",
+  "framework": "springboot",
+  "trigger-mode": "auto",
+  "sync-mode": "incremental",
+  "scan-type": "changed"
+}

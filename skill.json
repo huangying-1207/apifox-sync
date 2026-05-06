@@ -1,0 +1,100 @@
+{
+  "name": "api-sync-to-apifox",
+  "description": "与 Apifox 项目同步后端接口，支持自动解析接口增删改查和手动触发同步，字段说明使用中文展示。支持增量同步和全量更新。",
+  "category": "api-management",
+  "author": "Claude",
+  "version": "1.2.0",
+  "commands": [
+    {
+      "name": "sync",
+      "description": "同步后端接口到 Apifox",
+      "args": [
+        {
+          "name": "apifox-project-id",
+          "description": "Apifox 项目 ID",
+          "required": true
+        },
+        {
+          "name": "apifox-api-key",
+          "description": "Apifox API Key",
+          "required": true
+        },
+        {
+          "name": "source-type",
+          "description": "接口源类型: swagger (Swagger文档) 或 code (代码解析)",
+          "required": true,
+          "default": "swagger"
+        },
+        {
+          "name": "source-path",
+          "description": "源路径: Swagger URL 或 代码目录",
+          "required": true
+        },
+        {
+          "name": "framework",
+          "description": "后端框架: springboot (Spring Boot) 或 nodejs (Node.js)",
+          "required": false,
+          "default": "springboot"
+        },
+        {
+          "name": "trigger-mode",
+          "description": "触发模式: auto (自动) 或 manual (手动)",
+          "required": false,
+          "default": "auto"
+        },
+        {
+          "name": "sync-mode",
+          "description": "同步模式: incremental (增量同步仅变更) 或 full (全量更新所有接口)",
+          "required": false,
+          "default": "incremental"
+        }
+      ]
+    },
+    {
+      "name": "config",
+      "description": "生成或管理配置文件",
+      "args": [
+        {
+          "name": "action",
+          "description": "操作类型: init (初始化配置)",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "scan",
+      "description": "扫描后端接口变更（不执行同步）",
+      "args": [
+        {
+          "name": "source-type",
+          "description": "接口源类型: swagger (Swagger文档) 或 code (代码解析)",
+          "required": true,
+          "default": "swagger"
+        },
+        {
+          "name": "source-path",
+          "description": "源路径: Swagger URL 或 代码目录",
+          "required": true
+        },
+        {
+          "name": "framework",
+          "description": "后端框架: springboot (Spring Boot) 或 nodejs (Node.js)",
+          "required": false,
+          "default": "springboot"
+        },
+        {
+          "name": "scan-type",
+          "description": "扫描类型: all (所有接口) 或 changed (仅变更接口)",
+          "required": false,
+          "default": "changed"
+        }
+      ]
+    }
+  ],
+  "dependencies": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "install": "npm install",
+  "entry": "src/index.js"
+}
