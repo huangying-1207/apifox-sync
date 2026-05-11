@@ -173,7 +173,7 @@ class ApifoxSyncer {
           schemaOverwriteBehavior: 'OVERWRITE_EXISTING',
           updateFolderOfChangedEndpoint: false,
           prependBasePath: false,
-          deleteUnmatchedResources: true
+          deleteUnmatchedResources: false
         }
       }, {
         headers: {

@@ -8,6 +8,53 @@ const {
 const ErrorHandler = require('../utils/errorHandler');
 
 class ApiFormatter {
+  constructor() {
+    this.dtoSchemas = {};
+  }
+
+  /**
+   * 设置 DTO Schema 映射（由 scanner 提供）
+   */
+  setDtoSchemas(schemas) {
+    this.dtoSchemas = schemas || {};
+  }
+
+  /**
+   * Java 类型转 OpenAPI 类型
+   */
+  javaTypeToOpenApi(javaType) {
+    if (!javaType) return { type: 'string' };
+
+    const t = javaType.trim();
+
+    if (['Long', 'Integer', 'int', 'long', 'Short', 'short', 'Byte', 'byte'].includes(t)) {
+      return { type: 'integer' };
+    }
+    if (['Double', 'Float', 'double', 'float', 'BigDecimal'].includes(t)) {
+      return { type: 'number' };
+    }
+    if (['Boolean', 'boolean'].includes(t)) {
+      return { type: 'boolean' };
+    }
+    if (t === 'String') {
+      return { type: 'string' };
+    }
+    if (['Date', 'LocalDateTime', 'LocalDate', 'Timestamp', 'Instant', 'ZonedDateTime'].includes(t)) {
+      return { type: 'string', format: 'date-time' };
+    }
+    if (t === 'LocalTime') {
+      return { type: 'string', format: 'time' };
+    }
+    const listMatch = t.match(/^(?:List|Set|Collection)<(.+)>$/);
+    if (listMatch) {
+      const itemType = this.javaTypeToOpenApi(listMatch[1]);
+      return { type: 'array', items: itemType.type === 'object' ? { type: 'object' } : itemType };
+    }
+    if (this.dtoSchemas[t]) {
+      return { type: 'object', properties: this.generateObjectProperties(t) };
+    }
+    return { type: 'object' };
+  }
   /**
    * 格式化 OpenAPI 文档，确保字段说明为中文
    */
@@ -239,15 +286,15 @@ class ApiFormatter {
   /**
    * 根据返回值类型生成响应模式
    */
-  generateResponseSchema(returnType) {
+  generateResponseSchema(returnType, api) {
     // 简单类型的响应模式
     if (!returnType || ['String', 'Integer', 'Long', 'Boolean', 'Double', 'Float'].includes(returnType)) {
       return {
         type: 'object',
         properties: {
-          code: { type: 'integer', description: 'Auto-generated response code' },
-          message: { type: 'string', description: 'Auto-generated response message' },
-          data: { type: returnType.toLowerCase() === 'string' ? 'string' : 'integer', description: 'Auto-generated response data' }
+          code: { type: 'integer', description: '响应码' },
+          message: { type: 'string', description: '响应消息' },
+          data: { type: returnType && returnType.toLowerCase && returnType.toLowerCase() === 'string' ? 'string' : 'integer', description: '响应数据' }
         }
       };
     } else if (returnType.startsWith('List<') || returnType.startsWith('Set<')) {
@@ -256,15 +303,30 @@ class ApiFormatter {
       return {
         type: 'object',
         properties: {
-          code: { type: 'integer', description: 'Code字段' },
-          message: { type: 'string', description: 'Message字段' },
+          code: { type: 'integer', description: '响应码' },
+          message: { type: 'string', description: '响应消息' },
           data: {
             type: 'array',
-            description: 'Data字段',
+            description: '响应数据列表',
             items: {
               type: 'object',
-              properties: this.generateObjectProperties(genericType)
+              properties: this.generateObjectProperties(genericType, api)
             }
+          }
+        }
+      };
+    } else if (returnType === 'JSONObject') {
+      // JSON 对象类型的响应模式
+      return {
+        type: 'object',
+        properties: {
+          code: { type: 'integer', description: '响应码' },
+          message: { type: 'string', description: '响应消息' },
+          data: {
+            type: 'object',
+            description: '响应数据（JSON 对象）',
+            properties: this.generateObjectProperties(returnType, api),
+            additionalProperties: true
           }
         }
       };
@@ -273,12 +335,12 @@ class ApiFormatter {
       return {
         type: 'object',
         properties: {
-          code: { type: 'integer', description: 'Auto-generated response code' },
-          message: { type: 'string', description: 'Auto-generated response message' },
+          code: { type: 'integer', description: '响应码' },
+          message: { type: 'string', description: '响应消息' },
           data: {
             type: 'object',
-            description: `Auto-generated response data of type ${returnType}` ,
-            properties: this.generateObjectProperties(returnType)
+            description: `响应数据 (${returnType})`,
+            properties: this.generateObjectProperties(returnType, api)
           }
         }
       };
@@ -288,29 +350,65 @@ class ApiFormatter {
   /**
    * 生成对象类型的响应模式
    */
-  generateObjectProperties(objectType) {
-    // 这里可以根据对象类型生成相应的响应模式
-    if (objectType === 'UserDTO') {
-      return {
-        id: { type: 'integer', description: '用户ID' },
-        name: { type: 'string', description: '用户名' },
-        email: { type: 'string', description: '用户邮箱' },
-        createdAt: { type: 'string', format: 'date-time', description: '创建时间' },
-        updatedAt: { type: 'string', format: 'date-time', description: '更新时间' }
-      };
-    } else {
-      // 默认响应模式
-      return {
-        id: { type: 'integer', description: 'Auto-generated id' },
-        name: { type: 'string', description: 'Auto-generated name' },
-        createdAt: { type: 'string', format: 'date-time', description: 'Auto-generated created at' },
-        updatedAt: { type: 'string', format: 'date-time', description: 'Auto-generated updated at' }
-      };
+  generateObjectProperties(objectType, api) {
+    const props = {};
+
+    // 使用 baseType（JSON 转换前的原始类型）或 objectType 的 DTO Schema 作为基础字段
+    const baseObjectType = (api && api.baseType) ? api.baseType : objectType;
+    if (this.dtoSchemas[baseObjectType]) {
+      const fields = this.dtoSchemas[baseObjectType];
+      Object.keys(fields).forEach(fieldName => {
+        props[fieldName] = {
+          ...this.javaTypeToOpenApi(fields[fieldName]),
+          description: getDefaultPropDescription(fieldName)
+        };
+      });
     }
+
+    // 合并 mapFields（方法体中 .put() 添加的字段，会覆盖同名字段）
+    if (api && api.mapFields && Object.keys(api.mapFields).length > 0) {
+      Object.keys(api.mapFields).forEach(fieldName => {
+        const fieldDef = api.mapFields[fieldName];
+        props[fieldName] = {
+          ...fieldDef,
+          description: getDefaultPropDescription(fieldName)
+        };
+      });
+    }
+
+    // 如果有字段则返回，否则兜底
+    if (Object.keys(props).length > 0) {
+      return props;
+    }
+
+    // 兜底：最小默认 schema
+    return {
+      id: { type: 'integer', description: getDefaultPropDescription('id') },
+      name: { type: 'string', description: getDefaultPropDescription('name') }
+    };
+  }
+
+  /**
+   * 根据请求体类型生成 Schema
+   */
+  generateBodySchema(bodyType) {
+    const openApiType = this.javaTypeToOpenApi(bodyType);
+    if (openApiType.type === 'object' && this.dtoSchemas[bodyType]) {
+      openApiType.properties = this.generateObjectProperties(bodyType);
+      return openApiType;
+    }
+    if (openApiType.type === 'string' || openApiType.type === 'integer' || openApiType.type === 'number' || openApiType.type === 'boolean') {
+      return { type: openApiType.type };
+    }
+    return { type: 'object', description: `请求体 (${bodyType})` };
   }
 
   generateApiDocFromCode(detectedApis) {
     console.log('正在根据代码生成接口文档...');
+    console.log('检测到的接口数量:', detectedApis.length);
+    detectedApis.forEach((api, index) => {
+      console.log(`接口 ${index + 1}:`, api.method.toUpperCase(), api.path, '返回类型:', api.returnType);
+    });
 
     const openApiDoc = {
       openapi: '3.0.0',
@@ -340,7 +438,7 @@ class ApiFormatter {
             description: 'Auto-generated success response',
             content: {
               'application/json': {
-                schema: this.generateResponseSchema(api.returnType)
+                schema: this.generateResponseSchema(api.returnType, api)
               }
             }
           }
@@ -361,6 +459,20 @@ class ApiFormatter {
             }
           });
         });
+      }
+
+      // 添加请求体
+      if (api.requestBodyType) {
+        const bodySchema = this.generateBodySchema(api.requestBodyType);
+        operation.requestBody = {
+          description: '请求参数',
+          required: true,
+          content: {
+            'application/json': {
+              schema: bodySchema
+            }
+          }
+        };
       }
 
       openApiDoc.paths[api.path][api.method] = operation;

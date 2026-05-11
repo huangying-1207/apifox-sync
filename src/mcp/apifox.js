@@ -120,9 +120,9 @@ class ApifoxMCP {
   }
 
   /**
-   * 获取项目的所有接口信息
+   * 获取项目的所有接口信息（包含完整的 OpenAPI 文档）
    */
-  async getProjectApis(projectName) {
+  async getProjectApis(projectName, includeFullDoc = false) {
     const connectionInfo = this.connections.get(projectName);
     if (!connectionInfo) {
       console.error(`项目 "${projectName}" 未连接`);
@@ -151,23 +151,28 @@ class ApifoxMCP {
 
       if (response.data) {
         const openApiDoc = response.data;
-        const apis = [];
 
-        if (openApiDoc.paths) {
-          Object.keys(openApiDoc.paths).forEach(path => {
-            const methods = openApiDoc.paths[path];
-            Object.keys(methods).forEach(method => {
-              apis.push({
-                path: path,
-                method: method.toLowerCase(),
-                summary: methods[method].summary || '未命名接口',
-                description: methods[method].description || ''
+        if (includeFullDoc) {
+          // 直接返回完整的 OpenAPI 文档
+          return openApiDoc;
+        } else {
+          // 只返回接口的基本信息
+          const apis = [];
+          if (openApiDoc.paths) {
+            Object.keys(openApiDoc.paths).forEach(path => {
+              const methods = openApiDoc.paths[path];
+              Object.keys(methods).forEach(method => {
+                apis.push({
+                  path: path,
+                  method: method.toLowerCase(),
+                  summary: methods[method].summary || '未命名接口',
+                  description: methods[method].description || ''
+                });
               });
             });
-          });
+          }
+          return apis;
         }
-
-        return apis;
       }
 
       return null;

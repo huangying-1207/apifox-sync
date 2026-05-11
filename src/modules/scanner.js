@@ -7,6 +7,7 @@ const ErrorHandler = require('../utils/errorHandler');
 class ApiScanner {
   constructor() {
     this.changedFiles = [];
+    this.dtoSchemas = {};
   }
 
   /**
@@ -74,10 +75,150 @@ class ApiScanner {
   }
 
   /**
+   * 扫描 Java 类文件，提取字段定义
+   */
+  scanJavaClasses(sourcePath) {
+    const classSchemas = {};
+
+    try {
+      const javaFiles = globSync(`${sourcePath}/**/*.java`);
+      for (const file of javaFiles) {
+        const content = fs.readFileSync(file, 'utf8');
+        const className = path.basename(file, '.java');
+
+        // 跳过 Controller、Service、Repository 等非数据类
+        if (/@(Controller|RestController|Service|Repository|Component|Configuration|Aspect)\b/.test(content)) {
+          continue;
+        }
+
+        const fields = {};
+        const fieldPattern = /private\s+(\w+(?:<[^>]+>)?)\s+(\w+)\s*;/g;
+        let fieldMatch;
+        while ((fieldMatch = fieldPattern.exec(content)) !== null) {
+          fields[fieldMatch[2]] = fieldMatch[1];
+        }
+
+        if (Object.keys(fields).length > 0) {
+          classSchemas[className] = fields;
+        }
+      }
+
+      this.dtoSchemas = classSchemas;
+    } catch (error) {
+      console.warn('Java 类文件扫描失败，将使用默认 Schema');
+    }
+
+    return classSchemas;
+  }
+
+  /**
+   * 推断泛型集合的实际类型（如 List<Object> 中 Object 的实际类型）
+   * 通过分析方法体中 new Xxxx() 和 .add(varName) 调用推断
+   */
+  inferGenericTypes(returnType, methodContent, api) {
+    if (!returnType) return returnType;
+
+    const genericMatch = returnType.match(/^(List|Set|Collection)<(.+)>$/);
+    if (!genericMatch) return returnType;
+
+    const innerType = genericMatch[2];
+    if (innerType !== 'Object') return returnType;
+
+    const inferredTypes = new Set();
+
+    // 从方法体中查找 new XxxType() 调用
+    const newPattern = /new\s+(\w+)\s*\(/g;
+    let newMatch;
+    while ((newMatch = newPattern.exec(methodContent)) !== null) {
+      const typeName = newMatch[1];
+      if (!['ArrayList', 'HashMap', 'HashSet', 'LinkedList', 'TreeMap', 'TreeSet',
+            'String', 'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Object',
+            'Date', 'LinkedHashMap'].includes(typeName)) {
+        inferredTypes.add(typeName);
+      }
+    }
+
+    // 从 .add(varName) 调用追踪变量类型
+    if (inferredTypes.size === 0) {
+      const addPattern = /\w+\.add\s*\(\s*(\w+)\s*\)/g;
+      let addMatch;
+      while ((addMatch = addPattern.exec(methodContent)) !== null) {
+        const varName = addMatch[1];
+        const varDeclPattern = new RegExp(`(?:@\\w+(?:\\([^)]*\\))?\\s+)?(\\w+(?:<[^>]+>)?)\\s+${varName}\\b`);
+        const varDeclMatch = methodContent.match(varDeclPattern);
+        if (varDeclMatch) {
+          const varType = varDeclMatch[1];
+          if (!['String', 'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Object',
+                'int', 'long', 'double', 'float', 'boolean'].includes(varType)) {
+            inferredTypes.add(varType);
+          }
+        }
+      }
+    }
+
+    if (inferredTypes.size === 1) {
+      const actualType = [...inferredTypes][0];
+
+      // 如果推断出 JSONObject，尝试追踪 JSON.toJSON() 的原始对象类型
+      if (actualType === 'JSONObject' || actualType.includes('Map')) {
+        const toJsonPattern = /JSON\.toJSON\s*\(\s*(\w+)\s*\)/;
+        const toJsonMatch = methodContent.match(toJsonPattern);
+        if (toJsonMatch) {
+          const sourceVar = toJsonMatch[1];
+          const sourceDeclPattern = new RegExp(`(?:@\\w+(?:\\([^)]*\\))?\\s+)?(\\w+)\\s+${sourceVar}\\b`);
+          const sourceDeclMatch = methodContent.match(sourceDeclPattern);
+          if (sourceDeclMatch) {
+            api.baseType = sourceDeclMatch[1];
+          }
+        }
+      }
+
+      return `${genericMatch[1]}<${actualType}>`;
+    }
+
+    return returnType;
+  }
+
+  /**
+   * 从方法体中提取 Map.put() 调用的字段
+   */
+  extractMapFields(methodContent) {
+    const fields = {};
+
+    const putPattern = /\w+\.put\s*\(\s*"(\w+)"\s*,\s*([^)]+)\s*\)/g;
+    let match;
+    while ((match = putPattern.exec(methodContent)) !== null) {
+      const fieldName = match[1];
+      const valueExpr = match[2].trim();
+
+      if (/^".*"$/.test(valueExpr)) {
+        fields[fieldName] = { type: 'string' };
+      } else if (/^\d+$/.test(valueExpr)) {
+        fields[fieldName] = { type: 'integer' };
+      } else if (/^\d+\.\d+$/.test(valueExpr)) {
+        fields[fieldName] = { type: 'number' };
+      } else if (/^(true|false)$/.test(valueExpr)) {
+        fields[fieldName] = { type: 'boolean' };
+      } else if (/new\s+(java\.util\.)?Date/.test(valueExpr)) {
+        fields[fieldName] = { type: 'string', format: 'date-time' };
+      } else if (/^\d+L$/i.test(valueExpr)) {
+        fields[fieldName] = { type: 'integer' };
+      } else {
+        fields[fieldName] = { type: 'string' };
+      }
+    }
+
+    return fields;
+  }
+
+  /**
    * 扫描 Spring Boot 项目代码
    */
   async scanSpringBootCode(sourcePath) {
     const controllers = [];
+
+    this.scanJavaClasses(sourcePath);
+
     const apiPatterns = {
       'get': /@GetMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
       'post': /@PostMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
@@ -184,11 +325,30 @@ class ApiScanner {
             });
           }
 
-          // 匹配返回值类型，支持复杂类型如 List<UserDTO>
-          const returnTypePattern = /public\s+([^\s]+)\s+\w+\s*\(/;
+          // 匹配请求体 (@RequestBody)
+          const requestBodyPattern = /@RequestBody\s+(\w+(?:<[^>]+>)?)\s+(\w+)/;
+          const requestBodyMatch = methodContent.match(requestBodyPattern);
+          if (requestBodyMatch) {
+            api.requestBodyType = requestBodyMatch[1];
+          }
+
+          // 匹配返回值类型，支持复杂类型如 List<UserDTO> 和 JSON 对象类型
+          const returnTypePattern = /public\s+([^\s]+(\<[^\>]+\>)?)?\s+\w+\s*\(/;
           const returnTypeMatch = methodContent.match(returnTypePattern);
           if (returnTypeMatch) {
-            api.returnType = returnTypeMatch[1];
+            let returnType = returnTypeMatch[1];
+            // 处理 JSON 对象类型
+            if (returnType && (returnType.includes('JSONObject') || returnType.includes('Map') || returnType.includes('HashMap') ||
+                returnType.includes('LinkedHashMap') || returnType.includes('TreeMap'))) {
+              api.returnType = 'JSONObject';
+            } else {
+              api.returnType = this.inferGenericTypes(returnType, methodContent, api);
+            }
+            // 对所有方法都尝试提取 map put 字段
+            const mapFields = this.extractMapFields(methodContent);
+            if (Object.keys(mapFields).length > 0) {
+              api.mapFields = mapFields;
+            }
           }
 
           controllers.push(api);

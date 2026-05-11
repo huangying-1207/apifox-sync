@@ -107,6 +107,8 @@ class ApifoxSync {
         console.log('Options:');
         console.log('  --trigger-mode <auto|manual> 触发模式 (默认: auto)');
         console.log('  --sync-mode <incremental|full> 同步模式 (默认: incremental)');
+        console.log('  --apis <METHOD:PATH,...> 指定多个接口同步 (例如: "GET:/api/users,POST:/api/users")');
+        console.log('  --api-method <method> --api-path <path> 单独接口同步');
       } else if (commands === 'scan') {
         console.log('\nUsage:');
         console.log('  扫描所有接口:');
@@ -144,6 +146,7 @@ class ApifoxSync {
         }
 
         const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
+        this.formatter.setDtoSchemas(this.scanner.dtoSchemas);
 
         if (projectId && apiKey) {
           const existingApis = await this.syncer.getApifoxExistingApis(projectId, apiKey);
@@ -229,12 +232,19 @@ class ApifoxSync {
         console.log('启用手动触发同步模式');
       }
 
-      const { 'apifox-project-id': projectId, 'apifox-api-key': apiKey, 'source-type': sourceType, 'source-path': sourcePath, 'framework': framework, 'sync-mode': syncMode, 'api-path': apiPath, 'api-method': apiMethod } = args;
+      const { 'apifox-project-id': projectId, 'apifox-api-key': apiKey, 'source-type': sourceType, 'source-path': sourcePath, 'framework': framework, 'sync-mode': syncMode, 'api-path': apiPath, 'api-method': apiMethod, 'apis': apisParam } = args;
 
       let openApiDoc;
 
       if (sourceType === 'code') {
-        if (apiPath && apiMethod) {
+        if (apisParam) {
+          console.log(`启用多接口同步模式: ${apisParam}`);
+          openApiDoc = await this.generateMultipleApisDoc(sourcePath, framework, apisParam);
+          if (!openApiDoc) {
+            console.log('未找到任何指定的接口');
+            return;
+          }
+        } else if (apiPath && apiMethod) {
           console.log(`启用单独接口同步模式: ${apiMethod.toUpperCase()} ${apiPath}`);
           openApiDoc = await this.generateSingleApiDoc(sourcePath, framework, apiMethod, apiPath);
           if (!openApiDoc) {
@@ -253,6 +263,7 @@ class ApifoxSync {
           }
 
           const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
+          this.formatter.setDtoSchemas(this.scanner.dtoSchemas);
           openApiDoc = this.formatter.generateApiDocFromCode(detectedApis);
 
           if (syncMode === 'incremental' && !args['api-path']) {
@@ -327,6 +338,7 @@ class ApifoxSync {
    */
   async generateSingleApiDoc(sourcePath, framework, method, apiPath) {
     const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
+    this.formatter.setDtoSchemas(this.scanner.dtoSchemas);
     const targetApi = detectedApis.find(api =>
       api.method.toLowerCase() === method.toLowerCase() &&
       (api.path === apiPath || api.path === apiPath + '/' || api.path === apiPath.replace(/\/$/, ''))
@@ -337,6 +349,59 @@ class ApifoxSync {
     }
 
     return this.formatter.generateApiDocFromCode([targetApi]);
+  }
+
+  /**
+   * 生成多个指定接口的文档
+   * @param {string} sourcePath - 源代码路径
+   * @param {string} framework - 框架类型
+   * @param {string} apisParam - 接口列表，格式: "GET:/api/users,POST:/api/orders"
+   */
+  async generateMultipleApisDoc(sourcePath, framework, apisParam) {
+    const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
+    this.formatter.setDtoSchemas(this.scanner.dtoSchemas);
+
+    const apiList = apisParam.split(',').map(item => {
+      const parts = item.trim().split(':');
+      if (parts.length < 2) return null;
+      return { method: parts[0].trim(), path: parts.slice(1).join(':').trim() };
+    }).filter(Boolean);
+
+    if (apiList.length === 0) {
+      console.log('无效的接口列表格式，正确格式: "GET:/api/users,POST:/api/orders"');
+      return null;
+    }
+
+    const targetApis = [];
+    const notFound = [];
+
+    for (const apiSpec of apiList) {
+      const matched = detectedApis.find(api =>
+        api.method.toLowerCase() === apiSpec.method.toLowerCase() &&
+        (api.path === apiSpec.path || api.path === apiSpec.path + '/' || api.path === apiSpec.path.replace(/\/$/, ''))
+      );
+
+      if (matched) {
+        targetApis.push(matched);
+      } else {
+        notFound.push(`${apiSpec.method.toUpperCase()} ${apiSpec.path}`);
+      }
+    }
+
+    if (notFound.length > 0) {
+      console.log(`以下接口未找到: ${notFound.join(', ')}`);
+    }
+
+    if (targetApis.length === 0) {
+      return null;
+    }
+
+    console.log(`找到 ${targetApis.length} 个指定接口:`);
+    targetApis.forEach(api => {
+      console.log(`  ${api.method.toUpperCase()} ${api.path}`);
+    });
+
+    return this.formatter.generateApiDocFromCode(targetApis);
   }
 
   /**

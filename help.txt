@@ -24,6 +24,7 @@ api-sync-to-apifox sync [参数]
 - --sync-mode <incremental|full> (可选): 同步模式（默认: incremental）
 - --api-method <method> (可选): 单独接口同步的 HTTP 方法（GET/POST/PUT/DELETE）
 - --api-path <path> (可选): 单独接口同步的路径
+- --apis <apis> (可选): 指定多个接口同步，格式: "METHOD:PATH,METHOD:PATH"（例如: "GET:/api/users,POST:/api/users"）
 
 **示例：**
 1. 使用项目名称同步接口（需要先通过 MCP 连接项目）：
@@ -56,7 +57,12 @@ api-sync-to-apifox sync [参数]
    api-sync-to-apifox sync --apifox-project-id 12345 --apifox-api-key abc123 --source-type code --source-path "./backend" --framework springboot --api-method GET --api-path "/api/users"
    ```
 
-5. 单独同步 POST /api/users 接口：
+5. 指定多个接口同步：
+   ```
+   api-sync-to-apifox sync --apifox-project-id 12345 --apifox-api-key abc123 --source-type code --source-path "./backend" --framework springboot --apis "GET:/api/users,POST:/api/users,GET:/api/orders"
+   ```
+
+6. 单独同步 POST /api/users 接口：
    ```
    api-sync-to-apifox sync --apifox-project-id 12345 --apifox-api-key abc123 --source-type code --source-path "./backend" --framework springboot --api-method POST --api-path "/api/users"
    ```
