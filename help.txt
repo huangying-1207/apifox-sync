@@ -14,18 +14,24 @@ api-sync-to-apifox sync [参数]
 ```
 
 **参数列表：**
-- --apifox-project-id <ID> (必填): Apifox 项目 ID
-- --apifox-api-key <API_KEY> (必填): Apifox API 密钥
+- --apifox-project-id <ID> (可选): Apifox 项目 ID（如果已通过 MCP 连接项目，可省略）
+- --apifox-api-key <API_KEY> (可选): Apifox API 密钥（如果已通过 MCP 连接项目，可省略）
+- --project-name <name> (可选): 项目名称（从 MCP 连接信息中获取项目 ID 和 API 密钥）
 - --source-type <swagger|code> (必填): 接口源类型
 - --source-path <PATH> (必填): 源路径（Swagger URL 或代码目录）
-- --framework <springboot|nodejs> (可选): 后端框架类型（当 source-type 为 code 时必填）
+- --framework <springboot|nodejs|django> (可选): 后端框架类型（当 source-type 为 code 时必填）
 - --trigger-mode <auto|manual> (可选): 触发模式（默认: auto）
 - --sync-mode <incremental|full> (可选): 同步模式（默认: incremental）
 - --api-method <method> (可选): 单独接口同步的 HTTP 方法（GET/POST/PUT/DELETE）
 - --api-path <path> (可选): 单独接口同步的路径
 
 **示例：**
-1. 从 Swagger 同步接口：
+1. 使用项目名称同步接口（需要先通过 MCP 连接项目）：
+   ```
+   api-sync-to-apifox sync --project-name my-project --source-type code --source-path "./src" --framework springboot --sync-mode incremental
+   ```
+
+2. 从 Swagger 同步接口：
    ```
    api-sync-to-apifox sync --apifox-project-id 12345 --apifox-api-key abc123 --source-type swagger --source-path "https://api.example.com/v2/api-docs"
    ```
@@ -38,6 +44,11 @@ api-sync-to-apifox sync [参数]
 3. 从 Node.js 代码全量同步接口：
    ```
    api-sync-to-apifox sync --apifox-project-id 12345 --apifox-api-key abc123 --source-type code --source-path "./api" --framework nodejs --sync-mode full
+   ```
+
+4. 从 Django 代码同步接口：
+   ```
+   api-sync-to-apifox sync --apifox-project-id 12345 --apifox-api-key abc123 --source-type code --source-path "./django_project" --framework django --sync-mode incremental
    ```
 
 4. 单独同步 GET /api/users 接口：
@@ -61,7 +72,7 @@ api-sync-to-apifox scan [参数]
 **参数列表：**
 - --source-type <swagger|code> (必填): 接口源类型
 - --source-path <PATH> (必填): 源路径（Swagger URL 或代码目录）
-- --framework <springboot|nodejs> (可选): 后端框架类型（当 source-type 为 code 时必填）
+- --framework <springboot|nodejs|django> (可选): 后端框架类型（当 source-type 为 code 时必填）
 - --scan-type <all|changed> (可选): 扫描类型（默认: changed）
 
 **示例：**
@@ -73,6 +84,11 @@ api-sync-to-apifox scan [参数]
 2. 只扫描变更的接口：
    ```
    api-sync-to-apifox scan --source-type code --source-path "./backend" --framework springboot --scan-type changed
+   ```
+
+3. 扫描 Django 项目接口：
+   ```
+   api-sync-to-apifox scan --source-type code --source-path "./django_project" --framework django --scan-type all
    ```
 
 3. 扫描 Swagger 文档接口：
@@ -103,7 +119,7 @@ api-sync-to-apifox scan [参数]
 
 ### 2. 代码解析源（code）
 - 直接解析源代码获取接口信息
-- 支持 Spring Boot 和 Node.js 项目
+- 支持 Spring Boot、Node.js 和 Django 项目
 - 自动格式化接口说明为中文
 - 适用于文档不完整的项目
 
@@ -127,5 +143,52 @@ api-sync-to-apifox scan [参数]
    - 识别 @GetMapping、@PostMapping、@PutMapping、@DeleteMapping 注解的方法
 3. Node.js 支持：
    - 识别 app.get()、app.post()、app.put()、app.delete() 等路由方法
+4. Django 支持：
+   - 识别 urls.py 中的 path() 函数定义的路由
+   - 支持 GET、POST、PUT、DELETE 等 HTTP 方法
 4. 接口字段说明会自动格式化为中文
 5. 同步过程会显示详细的接口变更信息
+
+## MCP 控制台
+
+MCP (Model Context Protocol) 是一个交互式控制台，用于管理与 Apifox 服务器的连接。
+
+**启动 MCP 控制台：**
+```bash
+api-sync-to-apifox mcp
+```
+
+**可用命令：**
+connect <项目名> <项目ID> <API密钥>  - 连接到 Apifox 项目
+disconnect <项目名>                 - 断开与项目的连接
+status                               - 显示连接状态
+projects                             - 列出已连接的项目
+info <项目名>                        - 显示项目详细信息
+apis <项目名>                        - 获取项目接口列表
+team <项目名>                        - 获取项目团队成员
+documents <项目名>                   - 获取项目文档列表
+environments <项目名>                - 获取项目环境配置
+variables <项目名>                   - 获取项目变量配置
+help                                 - 显示帮助信息
+exit/quit                            - 退出控制台
+
+**使用示例：**
+1. 连接到项目：
+   ```
+   connect my-project 12345 abc123
+   ```
+
+2. 获取项目信息：
+   ```
+   info my-project
+   ```
+
+3. 获取接口列表：
+   ```
+   apis my-project
+   ```
+
+4. 退出控制台：
+   ```
+   exit
+   ```

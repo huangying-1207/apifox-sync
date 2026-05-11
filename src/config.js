@@ -1,10 +1,33 @@
 const fs = require('fs');
 const path = require('path');
+const ErrorHandler = require('./utils/errorHandler');
+const ConfigValidator = require('./utils/configValidator');
 
 class ConfigManager {
     constructor() {
         this.config = null;
         this.configPath = null;
+    }
+
+    /**
+     * 验证配置的完整性和正确性
+     */
+    validateConfig() {
+        if (!this.config) {
+            return null;
+        }
+
+        const validationErrors = ConfigValidator.validate(this.config);
+
+        if (validationErrors.length > 0) {
+            console.warn('配置验证失败：');
+            validationErrors.forEach(error => {
+                console.warn(`- ${error.message}`);
+            });
+            return validationErrors;
+        }
+
+        return null;
     }
 
     /**
@@ -41,9 +64,27 @@ class ConfigManager {
 
             const configContent = fs.readFileSync(this.configPath, 'utf8');
             this.config = JSON.parse(configContent);
+
+            // 验证配置
+            const validationErrors = this.validateConfig();
+            if (validationErrors) {
+                ErrorHandler.logError(
+                    new Error('配置验证失败'),
+                    {
+                        operation: 'readConfig',
+                        configPath: this.configPath,
+                        errors: validationErrors
+                    }
+                );
+            }
+
             return this.config;
         } catch (error) {
-            console.error('读取配置文件失败:', error.message);
+            ErrorHandler.handleFileError(error, this.configPath);
+            ErrorHandler.logError(error, {
+                operation: 'readConfig',
+                configPath: this.configPath
+            });
             return null;
         }
     }
@@ -67,17 +108,7 @@ class ConfigManager {
      * 创建默认配置文件
      */
     createDefaultConfig() {
-        const defaultConfig = {
-            "apifox-project-id": "",
-            "apifox-api-key": "",
-            "source-type": "code",
-            "source-path": "./src",
-            "framework": "springboot",
-            "trigger-mode": "auto",
-            "sync-mode": "incremental",
-            "scan-type": "changed"
-        };
-
+        const defaultConfig = ConfigValidator.generateDefaultConfig();
         const defaultPath = path.join(process.cwd(), '.apifoxsync.json');
         fs.writeFileSync(defaultPath, JSON.stringify(defaultConfig, null, 2));
         console.log(`已创建默认配置文件: ${defaultPath}`);

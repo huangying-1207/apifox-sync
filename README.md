@@ -90,8 +90,9 @@ api-sync-to-apifox sync --sync-mode full  # 全量更新
 ```
 
 **参数列表：**
-- --apifox-project-id <ID> (必填): Apifox 项目 ID
-- --apifox-api-key <API_KEY> (必填): Apifox API 密钥
+- --apifox-project-id <ID> (可选): Apifox 项目 ID（如果已通过 MCP 连接项目，可省略）
+- --apifox-api-key <API_KEY> (可选): Apifox API 密钥（如果已通过 MCP 连接项目，可省略）
+- --project-name <name> (可选): 项目名称（从 MCP 连接信息中获取项目 ID 和 API 密钥）
 - --source-type <swagger|code> (必填): 接口源类型（swagger: Swagger文档，code: 代码解析）
 - --source-path <路径> (必填): 源路径（代码目录或 Swagger 文档 URL）
 - --framework <springboot|nodejs> (可选): 后端框架类型（当 source-type 为 code 时必填）
@@ -100,6 +101,9 @@ api-sync-to-apifox sync --sync-mode full  # 全量更新
 
 **使用示例：**
 ```bash
+# 使用项目名称同步接口（需要先通过 MCP 连接项目）
+api-sync-to-apifox sync --project-name my-project --source-type code --source-path "./src" --framework springboot --sync-mode incremental
+
 # 使用配置文件同步接口
 api-sync-to-apifox sync
 
