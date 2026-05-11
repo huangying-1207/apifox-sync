@@ -1,0 +1,33 @@
+# Node.js dependencies
+node_modules/
+
+# Log files
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+
+# Configuration files
+.apifoxsync.json
+.apifox-credentials.json
+.env
+.env.local
+.env.*.local
+
+# API documentation files
+formatted-api-doc.json
+apifox-full-api-doc.json
+
+# MCP files
+src/mcp/.mcp-cache/
+src/mcp/.mcp-credentials/
+
+# Test files (if not needed to be committed)
+# testdata/
+

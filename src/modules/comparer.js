@@ -94,6 +94,57 @@ class ApiComparer {
       hasChanges = true;
     }
 
+    // 比较接口的参数列表
+    if (detectedApi.parameters && existingApi.parameters) {
+      const detectedParamNames = new Set(detectedApi.parameters.map(p => p.name));
+      const existingParamNames = new Set(existingApi.parameters.map(p => p.name));
+      const paramDiff = [...detectedParamNames].filter(x => !existingParamNames.has(x))
+                        .concat([...existingParamNames].filter(x => !detectedParamNames.has(x)));
+      if (paramDiff.length > 0) {
+        hasChanges = true;
+      }
+    } else if (detectedApi.parameters || existingApi.parameters) {
+      hasChanges = true;
+    }
+
+    // 比较接口的响应内容（如果有的话）
+    if (detectedApi.response && existingApi.response && detectedApi.response !== existingApi.response) {
+      hasChanges = true;
+    }
+
+    return hasChanges;
+  }
+
+  /**
+   * 比较接口的详细信息
+   */
+  compareApiDetails(detectedApi, existingApi) {
+    let hasChanges = false;
+
+    // 比较路径参数
+    const detectedParams = detectedApi.path.match(/\{[^}]+\}/g) || [];
+    const existingParams = existingApi.path.match(/\{[^}]+\}/g) || [];
+    if (detectedParams.length !== existingParams.length) {
+      hasChanges = true;
+    } else {
+      const detectedParamSet = new Set(detectedParams.map(p => p.replace(/[{}]/g, '')));
+      const existingParamSet = new Set(existingParams.map(p => p.replace(/[{}]/g, '')));
+      const paramDiff = [...detectedParamSet].filter(x => !existingParamSet.has(x))
+                        .concat([...existingParamSet].filter(x => !detectedParamSet.has(x)));
+      if (paramDiff.length > 0) {
+        hasChanges = true;
+      }
+    }
+
+    // 比较接口的其他属性（如方法、路径等）
+    if (detectedApi.method !== existingApi.method) {
+      hasChanges = true;
+    }
+
+    if (detectedApi.path !== existingApi.path) {
+      hasChanges = true;
+    }
+
     // 比较接口的响应内容（如果有的话）
     if (detectedApi.response && existingApi.response && detectedApi.response !== existingApi.response) {
       hasChanges = true;
@@ -181,6 +232,29 @@ class ApiComparer {
 
     if (detectedApi.path !== existingApi.path) {
       changes.push(`路径: 从 ${existingApi.path} 变为 ${detectedApi.path}`);
+    }
+
+    // 比较接口的参数列表
+    if (detectedApi.parameters && existingApi.parameters) {
+      const detectedParamNames = new Set(detectedApi.parameters.map(p => p.name));
+      const existingParamNames = new Set(existingApi.parameters.map(p => p.name));
+
+      const addedParams = [...detectedParamNames].filter(x => !existingParamNames.has(x));
+      const removedParams = [...existingParamNames].filter(x => !detectedParamNames.has(x));
+
+      if (addedParams.length > 0) {
+        changes.push(`新增参数: ${addedParams.join(', ')}`);
+      }
+
+      if (removedParams.length > 0) {
+        changes.push(`删除参数: ${removedParams.join(', ')}`);
+      }
+    } else if (detectedApi.parameters || existingApi.parameters) {
+      if (detectedApi.parameters) {
+        changes.push(`新增参数: ${detectedApi.parameters.map(p => p.name).join(', ')}`);
+      } else {
+        changes.push(`删除参数: ${existingApi.parameters.map(p => p.name).join(', ')}`);
+      }
     }
 
     // 比较接口的响应内容（如果有的话）

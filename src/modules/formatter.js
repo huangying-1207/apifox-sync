@@ -236,6 +236,79 @@ class ApiFormatter {
   /**
    * 生成接口文档
    */
+  /**
+   * 根据返回值类型生成响应模式
+   */
+  generateResponseSchema(returnType) {
+    // 简单类型的响应模式
+    if (!returnType || ['String', 'Integer', 'Long', 'Boolean', 'Double', 'Float'].includes(returnType)) {
+      return {
+        type: 'object',
+        properties: {
+          code: { type: 'integer', description: 'Auto-generated response code' },
+          message: { type: 'string', description: 'Auto-generated response message' },
+          data: { type: returnType.toLowerCase() === 'string' ? 'string' : 'integer', description: 'Auto-generated response data' }
+        }
+      };
+    } else if (returnType.startsWith('List<') || returnType.startsWith('Set<')) {
+      // 集合类型的响应模式，如 List<UserDTO> 或 Set<UserDTO>
+      const genericType = returnType.match(/<([^>]+)>/)[1];
+      return {
+        type: 'object',
+        properties: {
+          code: { type: 'integer', description: 'Code字段' },
+          message: { type: 'string', description: 'Message字段' },
+          data: {
+            type: 'array',
+            description: 'Data字段',
+            items: {
+              type: 'object',
+              properties: this.generateObjectProperties(genericType)
+            }
+          }
+        }
+      };
+    } else {
+      // 对象类型的响应模式
+      return {
+        type: 'object',
+        properties: {
+          code: { type: 'integer', description: 'Auto-generated response code' },
+          message: { type: 'string', description: 'Auto-generated response message' },
+          data: {
+            type: 'object',
+            description: `Auto-generated response data of type ${returnType}` ,
+            properties: this.generateObjectProperties(returnType)
+          }
+        }
+      };
+    }
+  }
+
+  /**
+   * 生成对象类型的响应模式
+   */
+  generateObjectProperties(objectType) {
+    // 这里可以根据对象类型生成相应的响应模式
+    if (objectType === 'UserDTO') {
+      return {
+        id: { type: 'integer', description: '用户ID' },
+        name: { type: 'string', description: '用户名' },
+        email: { type: 'string', description: '用户邮箱' },
+        createdAt: { type: 'string', format: 'date-time', description: '创建时间' },
+        updatedAt: { type: 'string', format: 'date-time', description: '更新时间' }
+      };
+    } else {
+      // 默认响应模式
+      return {
+        id: { type: 'integer', description: 'Auto-generated id' },
+        name: { type: 'string', description: 'Auto-generated name' },
+        createdAt: { type: 'string', format: 'date-time', description: 'Auto-generated created at' },
+        updatedAt: { type: 'string', format: 'date-time', description: 'Auto-generated updated at' }
+      };
+    }
+  }
+
   generateApiDocFromCode(detectedApis) {
     console.log('正在根据代码生成接口文档...');
 
@@ -258,7 +331,7 @@ class ApiFormatter {
         openApiDoc.paths[api.path] = {};
       }
 
-      openApiDoc.paths[api.path][api.method] = {
+      const operation = {
         summary: `Auto-generated summary for ${api.method.toUpperCase()} ${api.path}`,
         description: `Auto-generated description for ${api.method.toUpperCase()} ${api.path}`,
         tags: [api.controller],
@@ -267,19 +340,30 @@ class ApiFormatter {
             description: 'Auto-generated success response',
             content: {
               'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    code: { type: 'integer', description: 'Auto-generated response code' },
-                    message: { type: 'string', description: 'Auto-generated response message' },
-                    data: { type: 'object', description: 'Auto-generated response data' }
-                  }
-                }
+                schema: this.generateResponseSchema(api.returnType)
               }
             }
           }
         }
       };
+
+      // 添加接口参数
+      if (api.parameters && api.parameters.length > 0) {
+        operation.parameters = [];
+        api.parameters.forEach(param => {
+          operation.parameters.push({
+            name: param.name,
+            in: param.type,
+            required: true,
+            description: `Auto-generated description for ${param.name}`,
+            schema: {
+              type: 'string'
+            }
+          });
+        });
+      }
+
+      openApiDoc.paths[api.path][api.method] = operation;
     });
 
     return openApiDoc;

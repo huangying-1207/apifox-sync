@@ -72,8 +72,10 @@ class ApifoxSync {
         parsed['apifox-api-key'] = connectionInfo.apiKey;
         console.log(`使用 MCP 项目 "${parsed['project-name']}" 的连接信息 (ID: ${connectionInfo.projectId})`);
       } else {
-        console.error(`项目 "${parsed['project-name']}" 未连接，请先使用 mcp connect 命令连接项目`);
-        process.exit(1);
+        // 如果没有连接到项目，不强制要求连接，继续执行
+        console.warn(`项目 "${parsed['project-name']}" 未连接，将只扫描接口变化`);
+        parsed['apifox-project-id'] = null;
+        parsed['apifox-api-key'] = null;
       }
     }
 
@@ -211,9 +213,16 @@ class ApifoxSync {
       console.log('=== 开始 Apifox 接口同步 ===');
 
       const args = this.parseArgs();
-      const connectionValid = await this.syncer.validateApifoxConnection(args['apifox-project-id'], args['apifox-api-key']);
-      if (!connectionValid) {
-        process.exit(1);
+
+      // 检查是否连接到 Apifox 项目
+      let connectionValid = false;
+      if (args['apifox-project-id'] && args['apifox-api-key']) {
+        connectionValid = await this.syncer.validateApifoxConnection(args['apifox-project-id'], args['apifox-api-key']);
+        if (!connectionValid) {
+          console.warn('Apifox 连接无效，将只扫描接口变化');
+        }
+      } else {
+        console.warn('未提供 Apifox 项目信息，将只扫描接口变化');
       }
 
       if (args['trigger-mode'] === 'manual') {
@@ -247,31 +256,51 @@ class ApifoxSync {
           openApiDoc = this.formatter.generateApiDocFromCode(detectedApis);
 
           if (syncMode === 'incremental' && !args['api-path']) {
-            const existingApis = await this.syncer.getApifoxExistingApis(projectId, apiKey);
-            this.comparer.compareApiChanges(detectedApis, existingApis);
+            // 如果连接到 Apifox 项目，比较接口变化
+            if (args['apifox-project-id'] && args['apifox-api-key']) {
+              const existingApis = await this.syncer.getApifoxExistingApis(projectId, apiKey);
+              this.comparer.compareApiChanges(detectedApis, existingApis);
 
-            if (this.comparer.scanResults.added.length > 0 || this.comparer.scanResults.updated.length > 0 || this.comparer.scanResults.removed.length > 0) {
-              const readline = require('readline');
-              const rl = readline.createInterface({
-                input: process.stdin,
-                output: process.stdout
-              });
+              if (this.comparer.scanResults.added.length > 0 || this.comparer.scanResults.updated.length > 0 || this.comparer.scanResults.removed.length > 0) {
+                const readline = require('readline');
+                const rl = readline.createInterface({
+                  input: process.stdin,
+                  output: process.stdout
+                });
 
-              rl.question('\n是否继续同步以上接口变更？(y/N): ', (answer) => {
-                if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
-                  rl.close();
-                  const formattedDoc = this.formatter.formatOpenApiDoc(openApiDoc);
-                  this.performSync(formattedDoc, projectId, apiKey, syncMode, detectedApis, existingApis);
-                } else {
-                  console.log('\n同步已取消');
-                  rl.close();
-                  process.exit(0);
+                rl.question('\n是否继续同步以上接口变更？(y/N): ', (answer) => {
+                  if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
+                    rl.close();
+                    const formattedDoc = this.formatter.formatOpenApiDoc(openApiDoc);
+                    this.performSync(formattedDoc, projectId, apiKey, syncMode, detectedApis, existingApis);
+                  } else {
+                    console.log('\n同步已取消');
+                    rl.close();
+                    process.exit(0);
+                  }
+                });
+
+                return;
+              } else {
+                console.log('无接口变更，无需同步');
+                return;
+              }
+            } else {
+              // 如果没有连接到 Apifox 项目，生成并格式化接口文档
+              console.log('未连接到 Apifox 项目，将生成并格式化接口文档');
+              console.log(`发现接口: ${detectedApis.length}个`);
+              console.log('接口详情:');
+              detectedApis.forEach(api => {
+                console.log(`  ${api.method.toUpperCase()} ${api.path} (${api.controller})`);
+                if (api.parameters && api.parameters.length > 0) {
+                  console.log(`    参数: ${api.parameters.map(param => param.name + '(' + param.type + ')').join(', ')}`);
                 }
               });
 
-              return;
-            } else {
-              console.log('无接口变更，无需同步');
+              // 生成并格式化接口文档
+              const formattedDoc = this.formatter.formatOpenApiDoc(openApiDoc);
+              this.syncer.saveDocToFile(formattedDoc, 'apifox-full-api-doc.json');
+              console.log('接口文档已生成并格式化，保存到 apifox-full-api-doc.json 文件');
               return;
             }
           }
@@ -315,16 +344,26 @@ class ApifoxSync {
    */
   async performSync(formattedDoc, projectId, apiKey, syncMode, detectedApis = [], existingApis = []) {
     try {
-      const result = await this.syncer.syncToApifox(formattedDoc, projectId, apiKey);
+      // 如果连接到 Apifox 项目，同步接口
+      if (projectId && apiKey) {
+        const result = await this.syncer.syncToApifox(formattedDoc, projectId, apiKey);
 
-      console.log('\n=== 同步完成 ===');
-      console.log('✅ 后端接口已成功同步到 Apifox');
-      console.log('✅ 所有字段说明已格式化为中文');
+        console.log('\n=== 同步完成 ===');
+        console.log('✅ 后端接口已成功同步到 Apifox');
+        console.log('✅ 所有字段说明已格式化为中文');
 
-      if (syncMode === 'incremental' && Object.keys(this.comparer.scanResults).length > 0 && (this.comparer.scanResults.added.length > 0 || this.comparer.scanResults.updated.length > 0 || this.comparer.scanResults.removed.length > 0)) {
-        this.comparer.outputChangeDetails(detectedApis, existingApis);
-      } else if (syncMode === 'full') {
-        console.log('全量更新模式：所有接口已同步');
+        if (syncMode === 'incremental' && Object.keys(this.comparer.scanResults).length > 0 && (this.comparer.scanResults.added.length > 0 || this.comparer.scanResults.updated.length > 0 || this.comparer.scanResults.removed.length > 0)) {
+          this.comparer.outputChangeDetails(detectedApis, existingApis);
+        } else if (syncMode === 'full') {
+          console.log('全量更新模式：所有接口已同步');
+        }
+      } else {
+        // 如果没有连接到 Apifox 项目，只格式化接口文档
+        console.log('\n=== 接口文档已格式化 ===');
+        console.log('✅ 后端接口文档已成功格式化');
+        console.log('✅ 所有字段说明已格式化为中文');
+        console.log('❌ 未连接到 Apifox 项目，无法同步接口');
+        console.log('请使用 mcp connect 命令连接到 Apifox 项目后再次执行同步命令');
       }
 
     } catch (error) {

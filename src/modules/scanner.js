@@ -153,15 +153,42 @@ class ApiScanner {
             parameters: []
           };
 
-          const paramPattern = /@PathVariable\s*(\w+)/g;
-          const paramMatches = [...content.matchAll(paramPattern)];
-          if (paramMatches.length > 0) {
-            paramMatches.forEach(paramMatch => {
+          // 确定当前方法的范围，只在该范围内匹配参数
+          const methodStart = match.index;
+          const methodEnd = this.findMethodEnd(content, methodStart);
+          const methodContent = content.slice(methodStart, methodEnd);
+          console.log(`方法内容: ${methodContent}`);
+
+          // 匹配路径参数 (@PathVariable)
+          const pathParamPattern = /@PathVariable(?:\([^)]*\))?\s*\w+\s*(\w+)/g;
+          const pathParamMatches = [...methodContent.matchAll(pathParamPattern)];
+          if (pathParamMatches.length > 0) {
+            pathParamMatches.forEach(paramMatch => {
               api.parameters.push({
                 name: paramMatch[1],
                 type: 'path'
               });
             });
+          }
+
+          // 匹配查询参数 (@RequestParam)
+          const queryParamPattern = /@RequestParam(?:\([^)]*\))?\s*\w+\s*(\w+)/g;
+          const queryParamMatches = [...methodContent.matchAll(queryParamPattern)];
+          console.log(`查询参数匹配结果: ${JSON.stringify(queryParamMatches, null, 2)}`);
+          if (queryParamMatches.length > 0) {
+            queryParamMatches.forEach(paramMatch => {
+              api.parameters.push({
+                name: paramMatch[1],
+                type: 'query'
+              });
+            });
+          }
+
+          // 匹配返回值类型，支持复杂类型如 List<UserDTO>
+          const returnTypePattern = /public\s+([^\s]+)\s+\w+\s*\(/;
+          const returnTypeMatch = methodContent.match(returnTypePattern);
+          if (returnTypeMatch) {
+            api.returnType = returnTypeMatch[1];
           }
 
           controllers.push(api);
@@ -170,6 +197,48 @@ class ApiScanner {
     }
 
     return controllers;
+  }
+
+  /**
+   * 确定方法的结束位置
+   */
+  findMethodEnd(content, startIndex) {
+    let braceCount = 0;
+    let inString = false;
+    let inComment = false;
+
+    for (let i = startIndex; i < content.length; i++) {
+      const char = content[i];
+
+      // 处理字符串
+      if (char === '"' || char === "'") {
+        inString = !inString;
+      } else if (!inString && !inComment) {
+        // 处理注释
+        if (char === '/' && content[i + 1] === '*') {
+          inComment = true;
+          i++;
+        } else if (char === '/' && content[i + 1] === '/') {
+          // 单行注释，跳过到行尾
+          while (i < content.length && content[i] !== '\n') {
+            i++;
+          }
+        } else if (char === '{') {
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            return i + 1;
+          }
+        }
+      } else if (inComment && char === '*' && content[i + 1] === '/') {
+        inComment = false;
+        i++;
+      }
+    }
+
+    // 如果没有找到对应的闭合大括号，返回内容的结尾
+    return content.length;
   }
 
   /**
