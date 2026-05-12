@@ -2,29 +2,37 @@
  * 错误处理工具
  */
 
-class ErrorHandler {
+import fs from 'fs';
+import path from 'path';
+
+export class ErrorHandler {
   /**
    * 处理网络请求错误
    */
-  static handleNetworkError(error) {
+  static handleNetworkError(error: any) {
     console.error('❌ 网络请求失败');
 
     if (error.response) {
       console.error(`状态码: ${error.response.status}`);
       console.error(`响应数据: ${JSON.stringify(error.response.data, null, 2)}`);
-      console.error(`响应头: ${JSON.stringify(error.response.headers, null, 2)}`);
 
-      if (error.response.status === 401) {
-        console.error('  - 认证失败，请检查 API 密钥是否有效');
-      } else if (error.response.status === 403) {
-        console.error('  - 权限不足，请检查您是否有访问该项目的权限');
-      } else if (error.response.status === 404) {
-        console.error('  - 请求的资源不存在，请检查项目 ID 是否正确');
-      } else if (error.response.status === 500) {
-        console.error('  - 服务器内部错误，请稍后重试');
+      const errorTypes: Record<number, string> = {
+        400: '请求参数错误，请检查输入格式',
+        401: '认证失败，请检查 API 密钥是否有效',
+        403: '权限不足，请检查您是否有访问该项目的权限',
+        404: '资源不存在，请检查项目 ID 是否正确',
+        429: '请求频率超限，请稍后重试',
+        500: '服务器内部错误，请稍后重试',
+        503: '服务器维护中，请稍后重试'
+      };
+
+      if (errorTypes[error.response.status]) {
+        console.error(`  - ${errorTypes[error.response.status]}`);
+      } else {
+        console.error(`  - 未知错误，状态码: ${error.response.status}`);
       }
     } else if (error.request) {
-      console.error('请求已发送但未收到响应');
+      console.error('请求已发送但未收到响应，请检查网络连接');
       console.error(`请求详情: ${error.request}`);
     } else {
       console.error(`请求配置错误: ${error.message}`);
@@ -36,16 +44,20 @@ class ErrorHandler {
   /**
    * 处理文件操作错误
    */
-  static handleFileError(error, fileName) {
+  static handleFileError(error: any, fileName: string) {
     console.error(`❌ 文件操作失败: ${fileName}`);
     console.error(`错误信息: ${error.message}`);
 
-    if (error.code === 'ENOENT') {
-      console.error('  - 文件不存在');
-    } else if (error.code === 'EACCES') {
-      console.error('  - 权限不足');
-    } else if (error.code === 'EISDIR') {
-      console.error('  - 目标路径是目录而不是文件');
+    const errorCodes: Record<string, string> = {
+      ENOENT: '  - 文件不存在',
+      EACCES: '  - 权限不足',
+      EISDIR: '  - 路径是目录而不是文件',
+      ENOTDIR: '  - 目标路径不是目录',
+      EEXIST: '  - 文件已存在'
+    };
+
+    if (errorCodes[error.code]) {
+      console.error(errorCodes[error.code]);
     }
 
     console.error(`错误堆栈: ${error.stack}`);
@@ -54,7 +66,7 @@ class ErrorHandler {
   /**
    * 处理配置错误
    */
-  static handleConfigError(error) {
+  static handleConfigError(error: any) {
     console.error('❌ 配置错误');
     console.error(`错误信息: ${error.message}`);
 
@@ -71,14 +83,18 @@ class ErrorHandler {
   /**
    * 处理代码扫描错误
    */
-  static handleScanError(error, sourcePath) {
+  static handleScanError(error: any, sourcePath: string) {
     console.error(`❌ 代码扫描失败: ${sourcePath}`);
     console.error(`错误信息: ${error.message}`);
 
-    if (error.code === 'ENOENT') {
-      console.error('  - 源代码目录不存在');
-    } else if (error.code === 'EACCES') {
-      console.error('  - 无法访问源代码目录');
+    const errorCodes: Record<string, string> = {
+      ENOENT: '  - 源代码目录不存在',
+      EACCES: '  - 无法访问源代码目录',
+      ENOTDIR: '  - 路径不是有效的目录'
+    };
+
+    if (errorCodes[error.code]) {
+      console.error(errorCodes[error.code]);
     }
 
     console.error(`错误堆栈: ${error.stack}`);
@@ -87,14 +103,18 @@ class ErrorHandler {
   /**
    * 处理同步错误
    */
-  static handleSyncError(error, apiInfo) {
+  static handleSyncError(error: any, apiInfo: string) {
     console.error(`❌ 接口同步失败: ${apiInfo}`);
     console.error(`错误信息: ${error.message}`);
 
-    if (error.code === 'API_RATE_LIMIT') {
-      console.error('  - API 请求频率超限，请稍后重试');
-    } else if (error.code === 'API_CONNECTION') {
-      console.error('  - 无法连接到 Apifox 服务器');
+    const errorCodes: Record<string, string> = {
+      API_RATE_LIMIT: '  - API 请求频率超限，请稍后重试',
+      API_CONNECTION: '  - 无法连接到 Apifox 服务器',
+      TIMEOUT: '  - 请求超时，请检查网络连接'
+    };
+
+    if (errorCodes[error.code]) {
+      console.error(errorCodes[error.code]);
     }
 
     console.error(`错误堆栈: ${error.stack}`);
@@ -103,7 +123,7 @@ class ErrorHandler {
   /**
    * 处理参数验证错误
    */
-  static handleValidationError(errors) {
+  static handleValidationError(errors: any[]) {
     console.error('❌ 参数验证失败');
     errors.forEach(error => {
       console.error(`  - ${error.message}`);
@@ -113,7 +133,7 @@ class ErrorHandler {
   /**
    * 处理未预期的错误
    */
-  static handleUnexpectedError(error) {
+  static handleUnexpectedError(error: any) {
     console.error('❌ 发生未预期的错误');
     console.error(`错误信息: ${error.message}`);
     console.error(`错误类型: ${error.constructor.name}`);
@@ -124,9 +144,9 @@ class ErrorHandler {
   /**
    * 创建自定义错误
    */
-  static createCustomError(type, message, details = {}) {
+  static createCustomError(type: string, message: string, details: any = {}) {
     const error = new Error(message);
-    error.type = type;
+    (error as any).type = type;
     Object.assign(error, details);
     return error;
   }
@@ -134,8 +154,8 @@ class ErrorHandler {
   /**
    * 格式化错误信息
    */
-  static formatError(error) {
-    const formatted = {
+  static formatError(error: any) {
+    const formatted: any = {
       type: error.type || 'UNEXPECTED',
       message: error.message,
       timestamp: new Date().toISOString(),
@@ -160,10 +180,7 @@ class ErrorHandler {
   /**
    * 记录错误日志
    */
-  static logError(error, context = {}) {
-    const fs = require('fs');
-    const path = require('path');
-
+  static logError(error: any, context: any = {}) {
     const logDir = path.join(__dirname, '../../logs');
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true });
@@ -185,4 +202,4 @@ class ErrorHandler {
   }
 }
 
-module.exports = ErrorHandler;
+export default ErrorHandler;

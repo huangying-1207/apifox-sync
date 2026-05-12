@@ -2,12 +2,16 @@
  * 配置验证工具
  */
 
-class ConfigValidator {
+import fs from 'fs';
+import path from 'path';
+import { Config } from '../types';
+
+export class ConfigValidator {
   /**
    * 验证配置的完整性和正确性
    */
-  static validate(config) {
-    const errors = [];
+  static validate(config: Partial<Config>): any[] {
+    const errors: any[] = [];
 
     if (!config) {
       errors.push({
@@ -18,7 +22,7 @@ class ConfigValidator {
     }
 
     // 验证必填字段
-    const requiredFields = [
+    const requiredFields: string[] = [
       'source-type',
       'source-path'
     ];
@@ -30,7 +34,7 @@ class ConfigValidator {
     }
 
     requiredFields.forEach(field => {
-      if (!config[field]) {
+      if (!config[field as keyof Config]) {
         errors.push({
           type: 'missing_field',
           field,
@@ -115,14 +119,14 @@ class ConfigValidator {
   /**
    * 验证配置是否有效
    */
-  static isValid(config) {
+  static isValid(config: Partial<Config>): boolean {
     return this.validate(config).length === 0;
   }
 
   /**
    * 格式化验证错误信息
    */
-  static formatErrors(errors) {
+  static formatErrors(errors: any[]): string[] {
     return errors.map(error => {
       let message = error.message;
       if (error.field) {
@@ -135,7 +139,7 @@ class ConfigValidator {
   /**
    * 生成默认配置
    */
-  static generateDefaultConfig() {
+  static generateDefaultConfig(): Config {
     return {
       "apifox-project-id": "",
       "apifox-api-key": "",
@@ -151,7 +155,7 @@ class ConfigValidator {
   /**
    * 合并配置
    */
-  static mergeConfigs(baseConfig, overrideConfig) {
+  static mergeConfigs(baseConfig: Config, overrideConfig: Partial<Config>): Config {
     return {
       ...baseConfig,
       ...overrideConfig
@@ -159,4 +163,4 @@ class ConfigValidator {
   }
 }
 
-module.exports = ConfigValidator;
+export default ConfigValidator;

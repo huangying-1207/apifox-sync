@@ -1,6 +1,6 @@
 const { expect } = require('chai');
 const sinon = require('sinon');
-const ErrorHandler = require('../src/utils/errorHandler');
+const { ErrorHandler } = require('../dist/utils/errorHandler');
 
 describe('Error Handler', () => {
   describe('handleNetworkError', () => {

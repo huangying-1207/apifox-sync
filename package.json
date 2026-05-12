@@ -2,27 +2,39 @@
   "name": "api-sync-to-apifox",
   "version": "1.3.0",
   "description": "Apifox 接口同步工具 - 自动同步后端接口到 Apifox 项目，支持增量同步和全量更新",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "bin": {
-    "api-sync-to-apifox": "src/index.js"
+    "api-sync-to-apifox": "dist/index.js"
   },
   "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
     "test": "mocha test/**/*.test.js --reporter spec",
-    "test:helper": "mocha test/helper.test.js --reporter spec",
-    "test:error": "mocha test/errorHandler.test.js --reporter spec",
-    "test:scanner": "mocha test/scanner.test.js --reporter spec",
-    "mcp": "node src/mcp/mcp-server.js",
-    "mcp:start": "node src/mcp/mcp-server.js",
-    "start": "node src/index.js",
-    "init": "node src/index.js config init",
-    "scan": "node src/index.js scan",
-    "sync": "node src/index.js sync",
-    "config": "node src/index.js config"
+    "test:dev": "mocha dist/test/**/*.test.js --reporter spec --watch-extensions ts,js --watch",
+    "test:helper": "mocha dist/test/helper.test.js --reporter spec",
+    "test:error": "mocha dist/test/errorHandler.test.js --reporter spec",
+    "test:scanner": "mocha dist/test/scanner.test.js --reporter spec",
+    "mcp": "node dist/mcp/mcp-server.js",
+    "mcp:start": "node dist/mcp/mcp-server.js",
+    "start": "node dist/index.js",
+    "init": "node dist/index.js config init",
+    "scan": "node dist/index.js scan",
+    "sync": "node dist/index.js sync",
+    "config": "node dist/index.js config",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write src/**/*.ts",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "axios": "^1.6.0",
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
     "glob": "^10.3.0",
     "js-yaml": "^4.1.0",
+    "ora": "^8.0.1",
+    "update-notifier": "^7.0.0",
     "yaml": "^2.3.0"
   },
   "keywords": [
@@ -33,8 +45,18 @@
   "author": "Claude",
   "license": "MIT",
   "devDependencies": {
+    "@types/chai": "^5.2.3",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^25.7.0",
+    "@types/sinon": "^21.0.1",
     "chai": "^6.2.2",
+    "eslint": "^10.3.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
     "mocha": "^11.7.5",
-    "sinon": "^22.0.0"
+    "prettier": "^3.8.3",
+    "sinon": "^22.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
   }
 }

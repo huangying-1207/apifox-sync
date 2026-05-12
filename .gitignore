@@ -19,6 +19,8 @@ temp/
 .env
 .env.local
 .env.*.local
+.claude/settings.local.json
+.settings.local.json
 
 # API documentation files
 formatted-api-doc.json
@@ -30,4 +32,10 @@ src/mcp/.mcp-credentials/
 
 # Test files (if not needed to be committed)
 # testdata/
+
+# TypeScript compilation output
+dist/
+*.js.map
+*.d.ts
+*.d.ts.map
 

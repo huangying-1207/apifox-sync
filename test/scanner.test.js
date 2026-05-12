@@ -1,12 +1,12 @@
 const { expect } = require('chai');
 const sinon = require('sinon');
-const ApiScanner = require('../src/modules/scanner');
+const ApiScanner = require('../dist/core/scanner/ApiScanner').default;
 
 describe('API Scanner', () => {
   describe('Spring Boot Code Scanner', () => {
     it('should scan Spring Boot code for APIs', async () => {
       const scanner = new ApiScanner();
-      const scanStub = sinon.stub(scanner, 'scanSpringBootCode').resolves([]);
+      const scanStub = sinon.stub(scanner, 'scanCodeByFramework').resolves([]);
 
       await scanner.scanCodeForChanges('./testdata/springboot', 'springboot');
 
@@ -18,7 +18,7 @@ describe('API Scanner', () => {
   describe('Node.js Code Scanner', () => {
     it('should scan Node.js code for APIs', async () => {
       const scanner = new ApiScanner();
-      const scanStub = sinon.stub(scanner, 'scanNodeJsCode').resolves([]);
+      const scanStub = sinon.stub(scanner, 'scanCodeByFramework').resolves([]);
 
       await scanner.scanCodeForChanges('./testdata/nodejs', 'nodejs');
 
@@ -30,7 +30,7 @@ describe('API Scanner', () => {
   describe('Django Code Scanner', () => {
     it('should scan Django code for APIs', async () => {
       const scanner = new ApiScanner();
-      const scanStub = sinon.stub(scanner, 'scanDjangoCode').resolves([]);
+      const scanStub = sinon.stub(scanner, 'scanCodeByFramework').resolves([]);
 
       await scanner.scanCodeForChanges('./testdata/django', 'django');
 

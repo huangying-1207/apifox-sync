@@ -1,16 +1,22 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-const configManager = require('./config');
-const ApiScanner = require('./modules/scanner');
-const ApiComparer = require('./modules/comparer');
-const ApiFormatter = require('./modules/formatter');
-const ApifoxSyncer = require('./modules/syncer');
-const ErrorHandler = require('./utils/errorHandler');
-const ConfigValidator = require('./utils/configValidator');
+import fs from 'fs';
+import path from 'path';
+import { configManager } from './config';
+import { ApiScanner } from './core/scanner/ApiScanner';
+import ApiComparer from './modules/comparer';
+import ApiFormatter from './modules/formatter';
+import ApifoxSyncer from './modules/syncer';
+import { ErrorHandler } from './utils/errorHandler';
+import { ConfigValidator } from './utils/configValidator';
+import { Config } from './types';
 
 class ApifoxSync {
+  private scanner: ApiScanner;
+  private comparer: any;
+  private formatter: any;
+  private syncer: any;
+
   constructor() {
     this.scanner = new ApiScanner();
     this.comparer = new ApiComparer();
@@ -21,9 +27,9 @@ class ApifoxSync {
   /**
    * 解析命令行参数
    */
-  parseArgs() {
+  parseArgs(): any {
     const args = process.argv.slice(2);
-    const parsed = {};
+    const parsed: any = {};
     let i = 0;
 
     while (i < args.length) {
@@ -58,14 +64,14 @@ class ApifoxSync {
     if (config) {
       Object.keys(config).forEach(key => {
         if (parsed[key] === undefined) {
-          parsed[key] = config[key];
+          parsed[key] = (config as any)[key];
         }
       });
     }
 
     // 如果提供了 project-name 参数，从 MCP 获取连接信息
     if (parsed['project-name'] && !parsed['apifox-project-id'] && !parsed['apifox-api-key']) {
-      const apifoxMCP = require('./mcp/apifox');
+      const apifoxMCP = require('./mcp/apifox').default;
       const connectionInfo = apifoxMCP.getConnectionInfo(parsed['project-name']);
       if (connectionInfo) {
         parsed['apifox-project-id'] = connectionInfo.projectId;
@@ -85,7 +91,7 @@ class ApifoxSync {
   /**
    * 验证参数是否完整
    */
-  validateArgs(args) {
+  validateArgs(args: any): void {
     const commands = process.argv.slice(2)[0];
 
     // 使用 ConfigValidator 验证配置
@@ -126,12 +132,19 @@ class ApifoxSync {
   /**
    * 扫描命令执行
    */
-  async scan() {
+  async scan(): Promise<void> {
     try {
       console.log('=== 开始接口变化扫描 ===');
 
       const args = this.parseArgs();
-      const { 'source-type': sourceType, 'source-path': sourcePath, 'framework': framework, 'scan-type': scanType, 'apifox-project-id': projectId, 'apifox-api-key': apiKey } = args;
+      const {
+        'source-type': sourceType,
+        'source-path': sourcePath,
+        'framework': framework,
+        'scan-type': scanType,
+        'apifox-project-id': projectId,
+        'apifox-api-key': apiKey
+      } = args;
 
       if (projectId && apiKey) {
         const connectionValid = await this.syncer.validateApifoxConnection(projectId, apiKey);
@@ -146,7 +159,7 @@ class ApifoxSync {
         }
 
         const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
-        this.formatter.setDtoSchemas(this.scanner.dtoSchemas);
+        this.formatter.setDtoSchemas(this.scanner.getDtoSchemas());
 
         if (projectId && apiKey) {
           const existingApis = await this.syncer.getApifoxExistingApis(projectId, apiKey);
@@ -163,7 +176,7 @@ class ApifoxSync {
             console.log(`\n🚨 检测到接口变更！请执行 npm run sync 命令进行同步`);
           }
         } else {
-          if (scanType === 'changed' && this.scanner.changedFiles.length > 0) {
+          if (scanType === 'changed' && this.scanner.getChangedFiles().length > 0) {
             console.log(`只扫描变更的 ${detectedApis.length} 个接口:`);
             detectedApis.forEach(api => {
               console.log(`  ${api.method.toUpperCase()} ${api.path} (${api.controller})`);
@@ -195,7 +208,7 @@ class ApifoxSync {
         const apis = this.syncer.extractApisFromDoc(doc);
         console.log(`发现接口: ${apis.length}个`);
         console.log(`接口详情:`);
-        apis.forEach(api => {
+        apis.forEach((api: any) => {
           console.log(`  ${api.method.toUpperCase()} ${api.path} - ${api.summary}`);
         });
       }
@@ -203,7 +216,7 @@ class ApifoxSync {
       console.log('=== 扫描完成 ===');
     } catch (error) {
       console.error('Error: 扫描过程中发生错误');
-      console.error(error.stack);
+      console.error((error as any).stack);
       process.exit(1);
     }
   }
@@ -211,7 +224,7 @@ class ApifoxSync {
   /**
    * 主同步方法
    */
-  async sync() {
+  async sync(): Promise<void> {
     try {
       console.log('=== 开始 Apifox 接口同步 ===');
 
@@ -232,9 +245,19 @@ class ApifoxSync {
         console.log('启用手动触发同步模式');
       }
 
-      const { 'apifox-project-id': projectId, 'apifox-api-key': apiKey, 'source-type': sourceType, 'source-path': sourcePath, 'framework': framework, 'sync-mode': syncMode, 'api-path': apiPath, 'api-method': apiMethod, 'apis': apisParam } = args;
+      const {
+        'apifox-project-id': projectId,
+        'apifox-api-key': apiKey,
+        'source-type': sourceType,
+        'source-path': sourcePath,
+        'framework': framework,
+        'sync-mode': syncMode,
+        'api-path': apiPath,
+        'api-method': apiMethod,
+        'apis': apisParam
+      } = args;
 
-      let openApiDoc;
+      let openApiDoc: any;
 
       if (sourceType === 'code') {
         if (apisParam) {
@@ -263,7 +286,7 @@ class ApifoxSync {
           }
 
           const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
-          this.formatter.setDtoSchemas(this.scanner.dtoSchemas);
+          this.formatter.setDtoSchemas(this.scanner.getDtoSchemas());
           openApiDoc = this.formatter.generateApiDocFromCode(detectedApis);
 
           if (syncMode === 'incremental' && !args['api-path']) {
@@ -279,7 +302,7 @@ class ApifoxSync {
                   output: process.stdout
                 });
 
-                rl.question('\n是否继续同步以上接口变更？(y/N): ', (answer) => {
+                rl.question('\n是否继续同步以上接口变更？(y/N): ', (answer: string) => {
                   if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
                     rl.close();
                     const formattedDoc = this.formatter.formatOpenApiDoc(openApiDoc);
@@ -328,7 +351,7 @@ class ApifoxSync {
 
     } catch (error) {
       console.error('\nError: 同步过程中发生意外错误');
-      console.error(error.stack);
+      console.error((error as any).stack);
       process.exit(1);
     }
   }
@@ -336,9 +359,9 @@ class ApifoxSync {
   /**
    * 生成单个接口的文档
    */
-  async generateSingleApiDoc(sourcePath, framework, method, apiPath) {
+  async generateSingleApiDoc(sourcePath: string, framework: string, method: string, apiPath: string): Promise<any> {
     const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
-    this.formatter.setDtoSchemas(this.scanner.dtoSchemas);
+    this.formatter.setDtoSchemas(this.scanner.getDtoSchemas());
     const targetApi = detectedApis.find(api =>
       api.method.toLowerCase() === method.toLowerCase() &&
       (api.path === apiPath || api.path === apiPath + '/' || api.path === apiPath.replace(/\/$/, ''))
@@ -357,9 +380,9 @@ class ApifoxSync {
    * @param {string} framework - 框架类型
    * @param {string} apisParam - 接口列表，格式: "GET:/api/users,POST:/api/orders"
    */
-  async generateMultipleApisDoc(sourcePath, framework, apisParam) {
+  async generateMultipleApisDoc(sourcePath: string, framework: string, apisParam: string): Promise<any> {
     const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
-    this.formatter.setDtoSchemas(this.scanner.dtoSchemas);
+    this.formatter.setDtoSchemas(this.scanner.getDtoSchemas());
 
     const apiList = apisParam.split(',').map(item => {
       const parts = item.trim().split(':');
@@ -372,10 +395,10 @@ class ApifoxSync {
       return null;
     }
 
-    const targetApis = [];
-    const notFound = [];
+    const targetApis: any[] = [];
+    const notFound: string[] = [];
 
-    for (const apiSpec of apiList) {
+    for (const apiSpec of apiList as any[]) {
       const matched = detectedApis.find(api =>
         api.method.toLowerCase() === apiSpec.method.toLowerCase() &&
         (api.path === apiSpec.path || api.path === apiSpec.path + '/' || api.path === apiSpec.path.replace(/\/$/, ''))
@@ -407,7 +430,7 @@ class ApifoxSync {
   /**
    * 执行实际同步操作
    */
-  async performSync(formattedDoc, projectId, apiKey, syncMode, detectedApis = [], existingApis = []) {
+  async performSync(formattedDoc: any, projectId: string, apiKey: string, syncMode: string, detectedApis: any[] = [], existingApis: any[] = []): Promise<void> {
     try {
       // 如果连接到 Apifox 项目，同步接口
       if (projectId && apiKey) {
@@ -433,7 +456,7 @@ class ApifoxSync {
 
     } catch (error) {
       console.error('\nError: 同步过程中发生意外错误');
-      console.error(error.stack);
+      console.error((error as any).stack);
       process.exit(1);
     }
   }
@@ -442,7 +465,7 @@ class ApifoxSync {
 /**
  * 主入口函数
  */
-async function main() {
+async function main(): Promise<void> {
   const command = process.argv.slice(2)[0];
   const args = process.argv.slice(2);
 
@@ -480,7 +503,7 @@ async function main() {
       shell: true
     });
 
-    mcpProcess.on('close', (code) => {
+    mcpProcess.on('close', (code: number) => {
       console.log(`MCP 控制台已退出，代码: ${code}`);
     });
 

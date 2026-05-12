@@ -1,7 +1,10 @@
 {
-  "project-name": "simple-spring-boot",
+  "apifox-project-id": "",
+  "apifox-api-key": "",
   "source-type": "code",
-  "source-path": "D:\\IDEA\\simple-spring-boot",
+  "source-path": "./src",
   "framework": "springboot",
-  "sync-mode": "incremental"
+  "trigger-mode": "auto",
+  "sync-mode": "incremental",
+  "scan-type": "changed"
 }

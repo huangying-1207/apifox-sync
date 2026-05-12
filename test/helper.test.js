@@ -6,7 +6,7 @@ const {
   getDefaultParamDescription,
   getDefaultPropDescription,
   getDefaultResponseDescription
-} = require('../src/utils/helper');
+} = require('../dist/utils/helper');
 
 describe('Helper Functions', () => {
   describe('containsChinese', () => {

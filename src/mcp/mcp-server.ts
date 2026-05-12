@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const readline = require('readline');
-const apifoxMCP = require('./apifox');
+import readline from 'readline';
+import apifoxMCP from './apifox';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -9,6 +9,8 @@ const rl = readline.createInterface({
 });
 
 class MCPCommandHandler {
+  private commands: any;
+
   constructor() {
     this.commands = {
       'connect': this.handleConnect.bind(this),
@@ -24,7 +26,7 @@ class MCPCommandHandler {
     };
   }
 
-  async handleCommand(input) {
+  async handleCommand(input: string): Promise<void> {
     const parts = input.trim().split(/\s+/);
     const command = parts[0].toLowerCase();
 
@@ -36,7 +38,7 @@ class MCPCommandHandler {
     }
   }
 
-  async handleConnect(args) {
+  async handleConnect(args: string[]): Promise<void> {
     if (args.length < 3) {
       console.log('使用方法: connect <项目名> <项目ID> <API密钥>');
       return;
@@ -53,7 +55,7 @@ class MCPCommandHandler {
     }
   }
 
-  handleDisconnect(args) {
+  handleDisconnect(args: string[]): void {
     if (args.length < 1) {
       console.log('使用方法: disconnect <项目名>');
       return;
@@ -63,7 +65,7 @@ class MCPCommandHandler {
     apifoxMCP.disconnect(projectName);
   }
 
-  handleStatus(args) {
+  handleStatus(args: string[]): void {
     const connectedProjects = apifoxMCP.getConnectedProjects();
 
     if (connectedProjects.length === 0) {
@@ -80,7 +82,7 @@ class MCPCommandHandler {
     }
   }
 
-  handleListProjects() {
+  handleListProjects(): void {
     const connectedProjects = apifoxMCP.getConnectedProjects();
 
     if (connectedProjects.length === 0) {
@@ -93,7 +95,7 @@ class MCPCommandHandler {
     }
   }
 
-  async handleProjectInfo(args) {
+  async handleProjectInfo(args: string[]): Promise<void> {
     if (args.length < 1) {
       console.log('使用方法: info <项目名>');
       return;
@@ -108,14 +110,14 @@ class MCPCommandHandler {
     const info = apifoxMCP.getConnectionInfo(projectName);
     console.log(`项目信息: ${projectName}`);
     console.log(`项目ID: ${info.projectId}`);
-    console.log(`API密钥: ${info.apiKey.substring(0, 5)}...`);
+    console.log(`API密钥: ******`);
     console.log(`连接时间: ${new Date(info.connectedAt).toLocaleString()}`);
     console.log(`项目名称: ${info.projectInfo?.name || '未获取到名称'}`);
     console.log(`项目描述: ${info.projectInfo?.description || '无描述'}`);
     console.log(`项目状态: ${info.projectInfo?.status || '未知'}`);
   }
 
-  async handleGetApis(args) {
+  async handleGetApis(args: string[]): Promise<void> {
     if (args.length < 1) {
       console.log('使用方法: apis <项目名>');
       return;
@@ -130,7 +132,7 @@ class MCPCommandHandler {
     const apis = await apifoxMCP.getProjectApis(projectName);
     if (apis) {
       console.log(`项目 "${projectName}" 的接口列表 (共 ${apis.length} 个):`);
-      apis.forEach((api, index) => {
+      apis.forEach((api: any, index: number) => {
         console.log(`${index + 1}. [${api.method.toUpperCase()}] ${api.path}`);
         if (api.summary) {
           console.log(`   描述: ${api.summary}`);
@@ -139,7 +141,7 @@ class MCPCommandHandler {
     }
   }
 
-  async handleGetDocuments(args) {
+  async handleGetDocuments(args: string[]): Promise<void> {
     if (args.length < 1) {
       console.log('使用方法: documents <项目名>');
       return;
@@ -154,7 +156,7 @@ class MCPCommandHandler {
     const documents = await apifoxMCP.getProjectDocuments(projectName);
     if (documents) {
       console.log(`项目 "${projectName}" 的文档 (共 ${documents.length} 个):`);
-      documents.forEach((doc, index) => {
+      documents.forEach((doc: any, index: number) => {
         console.log(`${index + 1}. ${doc.title}`);
         if (doc.description) {
           console.log(`   描述: ${doc.description}`);
@@ -163,7 +165,7 @@ class MCPCommandHandler {
     }
   }
 
-  async handleGetEnvironments(args) {
+  async handleGetEnvironments(args: string[]): Promise<void> {
     if (args.length < 1) {
       console.log('使用方法: environments <项目名>');
       return;
@@ -178,7 +180,7 @@ class MCPCommandHandler {
     const environments = await apifoxMCP.getProjectEnvironments(projectName);
     if (environments) {
       console.log(`项目 "${projectName}" 的环境配置 (共 ${environments.length} 个):`);
-      environments.forEach((env, index) => {
+      environments.forEach((env: any, index: number) => {
         console.log(`${index + 1}. ${env.name}`);
         if (env.description) {
           console.log(`   描述: ${env.description}`);
@@ -187,7 +189,7 @@ class MCPCommandHandler {
     }
   }
 
-  async handleGetVariables(args) {
+  async handleGetVariables(args: string[]): Promise<void> {
     if (args.length < 1) {
       console.log('使用方法: variables <项目名>');
       return;
@@ -202,7 +204,7 @@ class MCPCommandHandler {
     const variables = await apifoxMCP.getProjectVariables(projectName);
     if (variables) {
       console.log(`项目 "${projectName}" 的变量配置 (共 ${variables.length} 个):`);
-      variables.forEach((variable, index) => {
+      variables.forEach((variable: any, index: number) => {
         console.log(`${index + 1}. ${variable.name}`);
         if (variable.description) {
           console.log(`   描述: ${variable.description}`);
@@ -211,7 +213,7 @@ class MCPCommandHandler {
     }
   }
 
-  handleHelp() {
+  handleHelp(): void {
     console.log('');
     console.log('Apifox MCP 命令列表:');
     console.log('');
@@ -231,11 +233,13 @@ class MCPCommandHandler {
 }
 
 class MCPInteractiveInterface {
+  private commandHandler: MCPCommandHandler;
+
   constructor() {
     this.commandHandler = new MCPCommandHandler();
   }
 
-  start() {
+  start(): void {
     console.log('=== Apifox MCP 交互式控制台 ===');
     console.log('输入 help 查看可用命令');
     console.log('');
@@ -249,8 +253,8 @@ class MCPInteractiveInterface {
     this.prompt();
   }
 
-  prompt() {
-    rl.question('apifox-mcp> ', async (input) => {
+  prompt(): void {
+    rl.question('apifox-mcp> ', async (input: string) => {
       if (input.toLowerCase() === 'exit' || input.toLowerCase() === 'quit') {
         console.log('=== 退出 ===');
         rl.close();
@@ -268,7 +272,7 @@ class MCPInteractiveInterface {
 }
 
 // 命令行参数处理
-async function main() {
+async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   if (args.length > 0) {
@@ -287,7 +291,7 @@ async function main() {
     } else {
       // 有管道输入，读取输入并执行命令
       let input = '';
-      stdin.on('data', (chunk) => {
+      stdin.on('data', (chunk: Buffer) => {
         input += chunk.toString();
       });
 

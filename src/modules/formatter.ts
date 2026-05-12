@@ -1,13 +1,16 @@
-const {
+import {
   containsChinese,
   getDefaultSummary,
   getDefaultParamDescription,
   getDefaultPropDescription,
   getDefaultResponseDescription
-} = require('../utils/helper');
-const ErrorHandler = require('../utils/errorHandler');
+} from '../utils/helper';
+import { ErrorHandler } from '../utils/errorHandler';
+import { ApiInfo } from '../types';
 
 class ApiFormatter {
+  private dtoSchemas: any;
+
   constructor() {
     this.dtoSchemas = {};
   }
@@ -15,14 +18,14 @@ class ApiFormatter {
   /**
    * 设置 DTO Schema 映射（由 scanner 提供）
    */
-  setDtoSchemas(schemas) {
+  setDtoSchemas(schemas: any): void {
     this.dtoSchemas = schemas || {};
   }
 
   /**
    * Java 类型转 OpenAPI 类型
    */
-  javaTypeToOpenApi(javaType) {
+  javaTypeToOpenApi(javaType: string): any {
     if (!javaType) return { type: 'string' };
 
     const t = javaType.trim();
@@ -55,10 +58,11 @@ class ApiFormatter {
     }
     return { type: 'object' };
   }
+
   /**
    * 格式化 OpenAPI 文档，确保字段说明为中文
    */
-  formatOpenApiDoc(doc) {
+  formatOpenApiDoc(doc: any): any {
     console.log('格式化 API 文档，确保字段说明使用中文...');
 
     if (doc.paths) {
@@ -76,7 +80,7 @@ class ApiFormatter {
           }
 
           if (operation.parameters) {
-            operation.parameters = operation.parameters.map(param => {
+            operation.parameters = operation.parameters.map((param: any) => {
               if (!param.description || !containsChinese(param.description)) {
                 param.description = getDefaultParamDescription(param.name);
               }
@@ -117,7 +121,7 @@ class ApiFormatter {
   /**
    * 格式化请求体
    */
-  formatRequestBody(requestBody) {
+  formatRequestBody(requestBody: any): void {
     if (requestBody.content && requestBody.content['application/json']) {
       const schema = requestBody.content['application/json'].schema;
       if (schema) {
@@ -133,7 +137,7 @@ class ApiFormatter {
   /**
    * 格式化响应
    */
-  formatResponses(responses) {
+  formatResponses(responses: any): void {
     Object.keys(responses).forEach(statusCode => {
       const response = responses[statusCode];
 
@@ -153,7 +157,7 @@ class ApiFormatter {
   /**
    * 格式化 Schema
    */
-  formatSchema(schema) {
+  formatSchema(schema: any): any {
     if (schema.description && !containsChinese(schema.description)) {
       schema.description = '数据模型';
     }
@@ -184,7 +188,7 @@ class ApiFormatter {
   /**
    * 统计需要格式化的接口数量（字段说明非中文的接口）
    */
-  countUnformattedChinese(doc) {
+  countUnformattedChinese(doc: any): number {
     let count = 0;
 
     if (doc.paths) {
@@ -202,7 +206,7 @@ class ApiFormatter {
           }
 
           if (operation.parameters) {
-            operation.parameters.forEach(param => {
+            operation.parameters.forEach((param: any) => {
               if (!containsChinese(param.description)) {
                 needFormat = true;
               }
@@ -210,7 +214,9 @@ class ApiFormatter {
           }
 
           if (operation.requestBody) {
-            this.checkRequestBodyForFormatting(operation.requestBody, needFormat);
+            if (this.checkRequestBodyForFormatting(operation.requestBody)) {
+              needFormat = true;
+            }
           }
 
           if (operation.responses) {
@@ -222,7 +228,9 @@ class ApiFormatter {
               if (response.content && response.content['application/json']) {
                 const schema = response.content['application/json'].schema;
                 if (schema) {
-                  this.checkSchemaForFormatting(schema, needFormat);
+                  if (this.checkSchemaForFormatting(schema)) {
+                    needFormat = true;
+                  }
                 }
               }
             });
@@ -241,52 +249,55 @@ class ApiFormatter {
   /**
    * 检查请求体是否需要格式化
    */
-  checkRequestBodyForFormatting(requestBody, needFormat) {
+  checkRequestBodyForFormatting(requestBody: any): boolean {
     if (requestBody.description && !containsChinese(requestBody.description)) {
-      needFormat = true;
+      return true;
     }
     if (requestBody.content) {
-      Object.keys(requestBody.content).forEach(contentType => {
+      for (const contentType of Object.keys(requestBody.content)) {
         const mediaType = requestBody.content[contentType];
-        if (mediaType.schema) {
-          this.checkSchemaForFormatting(mediaType.schema, needFormat);
+        if (mediaType.schema && this.checkSchemaForFormatting(mediaType.schema)) {
+          return true;
         }
-      });
+      }
     }
+    return false;
   }
 
   /**
    * 检查 Schema 是否需要格式化
    */
-  checkSchemaForFormatting(schema, needFormat) {
+  checkSchemaForFormatting(schema: any): boolean {
     if (schema.description && !containsChinese(schema.description)) {
-      needFormat = true;
+      return true;
     }
     if (schema.properties) {
-      Object.keys(schema.properties).forEach(propName => {
+      for (const propName of Object.keys(schema.properties)) {
         const prop = schema.properties[propName];
         if (!containsChinese(prop.description)) {
-          needFormat = true;
+          return true;
         }
         if (prop.type === 'object' && prop.properties) {
-          this.checkSchemaForFormatting(prop, needFormat);
+          if (this.checkSchemaForFormatting(prop)) {
+            return true;
+          }
         }
         if (prop.type === 'array' && prop.items) {
           if (prop.items.type === 'object' && prop.items.properties) {
-            this.checkSchemaForFormatting(prop.items, needFormat);
+            if (this.checkSchemaForFormatting(prop.items)) {
+              return true;
+            }
           }
         }
-      });
+      }
     }
+    return false;
   }
 
   /**
-   * 生成接口文档
-   */
-  /**
    * 根据返回值类型生成响应模式
    */
-  generateResponseSchema(returnType, api) {
+  generateResponseSchema(returnType: string, api: ApiInfo): any {
     // 简单类型的响应模式
     if (!returnType || ['String', 'Integer', 'Long', 'Boolean', 'Double', 'Float'].includes(returnType)) {
       return {
@@ -299,7 +310,18 @@ class ApiFormatter {
       };
     } else if (returnType.startsWith('List<') || returnType.startsWith('Set<')) {
       // 集合类型的响应模式，如 List<UserDTO> 或 Set<UserDTO>
-      const genericType = returnType.match(/<([^>]+)>/)[1];
+      const genericTypeMatch = returnType.match(/<([^>]+)>/);
+      if (!genericTypeMatch) {
+        return {
+          type: 'object',
+          properties: {
+            code: { type: 'integer', description: '响应码' },
+            message: { type: 'string', description: '响应消息' },
+            data: { type: 'array', description: '响应数据列表', items: { type: 'object' } }
+          }
+        };
+      }
+      const genericType = genericTypeMatch[1];
       return {
         type: 'object',
         properties: {
@@ -350,8 +372,8 @@ class ApiFormatter {
   /**
    * 生成对象类型的响应模式
    */
-  generateObjectProperties(objectType, api) {
-    const props = {};
+  generateObjectProperties(objectType: string, api?: ApiInfo): any {
+    const props: any = {};
 
     // 使用 baseType（JSON 转换前的原始类型）或 objectType 的 DTO Schema 作为基础字段
     const baseObjectType = (api && api.baseType) ? api.baseType : objectType;
@@ -367,8 +389,8 @@ class ApiFormatter {
 
     // 合并 mapFields（方法体中 .put() 添加的字段，会覆盖同名字段）
     if (api && api.mapFields && Object.keys(api.mapFields).length > 0) {
-      Object.keys(api.mapFields).forEach(fieldName => {
-        const fieldDef = api.mapFields[fieldName];
+      Object.keys(api.mapFields!).forEach(fieldName => {
+        const fieldDef = api.mapFields![fieldName];
         props[fieldName] = {
           ...fieldDef,
           description: getDefaultPropDescription(fieldName)
@@ -391,7 +413,7 @@ class ApiFormatter {
   /**
    * 根据请求体类型生成 Schema
    */
-  generateBodySchema(bodyType) {
+  generateBodySchema(bodyType: string): any {
     const openApiType = this.javaTypeToOpenApi(bodyType);
     if (openApiType.type === 'object' && this.dtoSchemas[bodyType]) {
       openApiType.properties = this.generateObjectProperties(bodyType);
@@ -403,14 +425,14 @@ class ApiFormatter {
     return { type: 'object', description: `请求体 (${bodyType})` };
   }
 
-  generateApiDocFromCode(detectedApis) {
+  generateApiDocFromCode(detectedApis: ApiInfo[]): any {
     console.log('正在根据代码生成接口文档...');
     console.log('检测到的接口数量:', detectedApis.length);
     detectedApis.forEach((api, index) => {
       console.log(`接口 ${index + 1}:`, api.method.toUpperCase(), api.path, '返回类型:', api.returnType);
     });
 
-    const openApiDoc = {
+    const openApiDoc: any = {
       openapi: '3.0.0',
       info: {
         title: '自动生成的 API 文档',
@@ -429,7 +451,7 @@ class ApiFormatter {
         openApiDoc.paths[api.path] = {};
       }
 
-      const operation = {
+      const operation: any = {
         summary: `Auto-generated summary for ${api.method.toUpperCase()} ${api.path}`,
         description: `Auto-generated description for ${api.method.toUpperCase()} ${api.path}`,
         tags: [api.controller],
@@ -438,7 +460,7 @@ class ApiFormatter {
             description: 'Auto-generated success response',
             content: {
               'application/json': {
-                schema: this.generateResponseSchema(api.returnType, api)
+                schema: this.generateResponseSchema(api.returnType!, api)
               }
             }
           }
@@ -482,4 +504,4 @@ class ApiFormatter {
   }
 }
 
-module.exports = ApiFormatter;
+export default ApiFormatter;

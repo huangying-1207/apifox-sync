@@ -1,7 +1,14 @@
-const { normalizePath } = require('../utils/helper');
-const ErrorHandler = require('../utils/errorHandler');
+import { normalizePath } from '../utils/helper';
+import { ErrorHandler } from '../utils/errorHandler';
+import { ApiInfo } from '../types';
 
 class ApiComparer {
+  public scanResults: {
+    added: ApiInfo[];
+    updated: ApiInfo[];
+    removed: ApiInfo[];
+  };
+
   constructor() {
     this.scanResults = {
       added: [],
@@ -13,16 +20,16 @@ class ApiComparer {
   /**
    * 比较接口变化
    */
-  compareApiChanges(detectedApis, existingApis) {
+  compareApiChanges(detectedApis: ApiInfo[], existingApis: ApiInfo[]): any {
     console.log('正在比较接口变化...');
 
-    const detectedMap = new Map();
+    const detectedMap = new Map<string, ApiInfo>();
     detectedApis.forEach(api => {
       const normalizedPath = normalizePath(api.path);
       detectedMap.set(`${api.method}:${normalizedPath}`, api);
     });
 
-    const existingMap = new Map();
+    const existingMap = new Map<string, ApiInfo>();
     existingApis.forEach(api => {
       const normalizedPath = normalizePath(api.path);
       existingMap.set(`${api.method.toLowerCase()}:${normalizedPath}`, api);
@@ -51,7 +58,7 @@ class ApiComparer {
         const existingApi = existingMap.get(`${api.method}:${normalizedPath}`);
 
         // 比较接口的详细信息
-        const hasChanges = this.compareApiDetails(api, existingApi);
+        const hasChanges = this.compareApiDetails(api, existingApi!);
         if (hasChanges) {
           this.scanResults.updated.push(api);
         }
@@ -67,7 +74,7 @@ class ApiComparer {
   /**
    * 比较接口的详细信息
    */
-  compareApiDetails(detectedApi, existingApi) {
+  compareApiDetails(detectedApi: ApiInfo, existingApi: ApiInfo): boolean {
     let hasChanges = false;
 
     // 比较路径参数
@@ -97,7 +104,7 @@ class ApiComparer {
     // 比较接口的参数列表
     if (detectedApi.parameters && existingApi.parameters) {
       const detectedParamNames = new Set(detectedApi.parameters.map(p => p.name));
-      const existingParamNames = new Set(existingApi.parameters.map(p => p.name));
+      const existingParamNames = new Set(existingApi.parameters!.map(p => p.name));
       const paramDiff = [...detectedParamNames].filter(x => !existingParamNames.has(x))
                         .concat([...existingParamNames].filter(x => !detectedParamNames.has(x)));
       if (paramDiff.length > 0) {
@@ -108,45 +115,7 @@ class ApiComparer {
     }
 
     // 比较接口的响应内容（如果有的话）
-    if (detectedApi.response && existingApi.response && detectedApi.response !== existingApi.response) {
-      hasChanges = true;
-    }
-
-    return hasChanges;
-  }
-
-  /**
-   * 比较接口的详细信息
-   */
-  compareApiDetails(detectedApi, existingApi) {
-    let hasChanges = false;
-
-    // 比较路径参数
-    const detectedParams = detectedApi.path.match(/\{[^}]+\}/g) || [];
-    const existingParams = existingApi.path.match(/\{[^}]+\}/g) || [];
-    if (detectedParams.length !== existingParams.length) {
-      hasChanges = true;
-    } else {
-      const detectedParamSet = new Set(detectedParams.map(p => p.replace(/[{}]/g, '')));
-      const existingParamSet = new Set(existingParams.map(p => p.replace(/[{}]/g, '')));
-      const paramDiff = [...detectedParamSet].filter(x => !existingParamSet.has(x))
-                        .concat([...existingParamSet].filter(x => !detectedParamSet.has(x)));
-      if (paramDiff.length > 0) {
-        hasChanges = true;
-      }
-    }
-
-    // 比较接口的其他属性（如方法、路径等）
-    if (detectedApi.method !== existingApi.method) {
-      hasChanges = true;
-    }
-
-    if (detectedApi.path !== existingApi.path) {
-      hasChanges = true;
-    }
-
-    // 比较接口的响应内容（如果有的话）
-    if (detectedApi.response && existingApi.response && detectedApi.response !== existingApi.response) {
+    if (detectedApi.returnType && existingApi.returnType && detectedApi.returnType !== existingApi.returnType) {
       hasChanges = true;
     }
 
@@ -156,17 +125,17 @@ class ApiComparer {
   /**
    * 输出接口变化详细信息
    */
-  outputChangeDetails(detectedApis, existingApis) {
+  outputChangeDetails(detectedApis: ApiInfo[], existingApis: ApiInfo[]): void {
     console.log('\n=== 接口变化详细信息 ===');
 
     // 创建快速查找的映射
-    const detectedMap = new Map();
+    const detectedMap = new Map<string, ApiInfo>();
     detectedApis.forEach(api => {
       const normalizedPath = normalizePath(api.path);
       detectedMap.set(`${api.method}:${normalizedPath}`, api);
     });
 
-    const existingMap = new Map();
+    const existingMap = new Map<string, ApiInfo>();
     existingApis.forEach(api => {
       const normalizedPath = normalizePath(api.path);
       existingMap.set(`${api.method.toLowerCase()}:${normalizedPath}`, api);
@@ -207,8 +176,8 @@ class ApiComparer {
   /**
    * 输出接口内容的变更详情
    */
-  outputApiChangeDetails(detectedApi, existingApi) {
-    const changes = [];
+  outputApiChangeDetails(detectedApi: ApiInfo, existingApi: ApiInfo): void {
+    const changes: string[] = [];
 
     // 比较路径参数
     const detectedParams = detectedApi.path.match(/\{[^}]+\}/g) || [];
@@ -237,7 +206,7 @@ class ApiComparer {
     // 比较接口的参数列表
     if (detectedApi.parameters && existingApi.parameters) {
       const detectedParamNames = new Set(detectedApi.parameters.map(p => p.name));
-      const existingParamNames = new Set(existingApi.parameters.map(p => p.name));
+      const existingParamNames = new Set(existingApi.parameters!.map(p => p.name));
 
       const addedParams = [...detectedParamNames].filter(x => !existingParamNames.has(x));
       const removedParams = [...existingParamNames].filter(x => !detectedParamNames.has(x));
@@ -253,18 +222,18 @@ class ApiComparer {
       if (detectedApi.parameters) {
         changes.push(`新增参数: ${detectedApi.parameters.map(p => p.name).join(', ')}`);
       } else {
-        changes.push(`删除参数: ${existingApi.parameters.map(p => p.name).join(', ')}`);
+        changes.push(`删除参数: ${existingApi.parameters!.map(p => p.name).join(', ')}`);
       }
     }
 
     // 比较接口的响应内容（如果有的话）
-    if (detectedApi.response && existingApi.response && detectedApi.response !== existingApi.response) {
-      changes.push(`响应内容已变更`);
+    if (detectedApi.returnType && existingApi.returnType && detectedApi.returnType !== existingApi.returnType) {
+      changes.push(`返回类型: 从 ${existingApi.returnType} 变为 ${detectedApi.returnType}`);
     }
 
     // 比较接口的描述
-    if (detectedApi.description && existingApi.description && detectedApi.description !== existingApi.description) {
-      changes.push(`描述: 从 "${existingApi.description}" 变为 "${detectedApi.description}"`);
+    if (detectedApi.controller && existingApi.controller && detectedApi.controller !== existingApi.controller) {
+      changes.push(`控制器: 从 ${existingApi.controller} 变为 ${detectedApi.controller}`);
     }
 
     // 输出变更详情
@@ -277,4 +246,4 @@ class ApiComparer {
   }
 }
 
-module.exports = ApiComparer;
+export default ApiComparer;
