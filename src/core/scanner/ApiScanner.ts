@@ -8,46 +8,45 @@ import path from 'path';
 import { sync as globSync } from 'glob';
 import { ApiInfo, FrameworkConfig } from '../../types';
 import { ErrorHandler } from '../../utils/errorHandler';
-import { normalizePath } from '../../utils/helper';
 
 const FRAMEWORK_CONFIGS: Record<string, FrameworkConfig> = {
   springboot: {
     name: 'Spring Boot',
     filePattern: '**/*Controller.java',
     methodPatterns: {
-      'get': /@GetMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
-      'post': /@PostMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
-      'put': /@PutMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
-      'delete': /@DeleteMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g
+      get: /@GetMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
+      post: /@PostMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
+      put: /@PutMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
+      delete: /@DeleteMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
     },
     classPathPattern: /@RequestMapping\s*\(\s*["']?([^"']*)["']?\s*\)/,
-    fileExts: ['.java']
+    fileExts: ['.java'],
   },
   nodejs: {
     name: 'Node.js',
     filePattern: '**/*{route,Route,router,Router,routes,Routes}*.{js,ts}',
     methodPatterns: {
-      'get': /(?:app|router|Route)\.get\s*\(\s*["'`]([^"'`]*)["'`]/g,
-      'post': /(?:app|router|Route)\.post\s*\(\s*["'`]([^"'`]*)["'`]/g,
-      'put': /(?:app|router|Route)\.put\s*\(\s*["'`]([^"'`]*)["'`]/g,
-      'delete': /(?:app|router|Route)\.delete\s*\(\s*["'`]([^"'`]*)["'`]/g,
-      'patch': /(?:app|router|Route)\.patch\s*\(\s*["'`]([^"'`]*)["'`]/g
+      get: /(?:app|router|Route)\.get\s*\(\s*["'`]([^"'`]*)["'`]/g,
+      post: /(?:app|router|Route)\.post\s*\(\s*["'`]([^"'`]*)["'`]/g,
+      put: /(?:app|router|Route)\.put\s*\(\s*["'`]([^"'`]*)["'`]/g,
+      delete: /(?:app|router|Route)\.delete\s*\(\s*["'`]([^"'`]*)["'`]/g,
+      patch: /(?:app|router|Route)\.patch\s*\(\s*["'`]([^"'`]*)["'`]/g,
     },
     classPathPattern: undefined,
-    fileExts: ['.js', '.ts']
+    fileExts: ['.js', '.ts'],
   },
   django: {
     name: 'Django',
     filePattern: '**/urls.py',
     methodPatterns: {
-      'get': /path\(\s*["']([^"']*)["'].*,.*views\./g,
-      'post': /path\(\s*["']([^"']*)["'].*,.*views\./g,
-      'put': /path\(\s*["']([^"']*)["'].*,.*views\./g,
-      'delete': /path\(\s*["']([^"']*)["'].*,.*views\./g
+      get: /path\(\s*["']([^"']*)["'].*,.*views\./g,
+      post: /path\(\s*["']([^"']*)["'].*,.*views\./g,
+      put: /path\(\s*["']([^"']*)["'].*,.*views\./g,
+      delete: /path\(\s*["']([^"']*)["'].*,.*views\./g,
     },
     classPathPattern: undefined,
-    fileExts: ['.py']
-  }
+    fileExts: ['.py'],
+  },
 };
 
 export class ApiScanner {
@@ -113,7 +112,7 @@ export class ApiScanner {
       console.log(`检测到 ${modifiedFiles.length} 个文件有变更`);
       this.changedFiles = modifiedFiles;
       return modifiedFiles;
-    } catch (error: any) {
+    } catch (_error: any) {
       console.warn('Git 变更检测失败，将扫描所有文件');
       this.changedFiles = [];
       return [];
@@ -152,7 +151,7 @@ export class ApiScanner {
       }
 
       this.dtoSchemas = classSchemas;
-    } catch (error: any) {
+    } catch (_error: any) {
       console.warn('Java 类文件扫描失败，将使用默认 Schema');
     }
 
@@ -179,9 +178,25 @@ export class ApiScanner {
     let newMatch;
     while ((newMatch = newPattern.exec(methodContent)) !== null) {
       const typeName = newMatch[1];
-      if (!['ArrayList', 'HashMap', 'HashSet', 'LinkedList', 'TreeMap', 'TreeSet',
-            'String', 'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Object',
-            'Date', 'LinkedHashMap'].includes(typeName)) {
+      if (
+        ![
+          'ArrayList',
+          'HashMap',
+          'HashSet',
+          'LinkedList',
+          'TreeMap',
+          'TreeSet',
+          'String',
+          'Integer',
+          'Long',
+          'Double',
+          'Float',
+          'Boolean',
+          'Object',
+          'Date',
+          'LinkedHashMap',
+        ].includes(typeName)
+      ) {
         inferredTypes.add(typeName);
       }
     }
@@ -196,8 +211,22 @@ export class ApiScanner {
         const varDeclMatch = methodContent.match(varDeclPattern);
         if (varDeclMatch) {
           const varType = varDeclMatch[1];
-          if (!['String', 'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Object',
-                'int', 'long', 'double', 'float', 'boolean'].includes(varType)) {
+          if (
+            ![
+              'String',
+              'Integer',
+              'Long',
+              'Double',
+              'Float',
+              'Boolean',
+              'Object',
+              'int',
+              'long',
+              'double',
+              'float',
+              'boolean',
+            ].includes(varType)
+          ) {
             inferredTypes.add(varType);
           }
         }
@@ -287,19 +316,19 @@ export class ApiScanner {
     this.scanJavaClasses(sourcePath);
 
     const apiPatterns = {
-      'get': /@GetMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
-      'post': /@PostMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
-      'put': /@PutMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
-      'delete': /@DeleteMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g
+      get: /@GetMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
+      post: /@PostMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
+      put: /@PutMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
+      delete: /@DeleteMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
     };
 
     let controllerFiles: string[];
 
     if (this.changedFiles.length > 0) {
       console.log('增量同步模式：只扫描变更的文件');
-      controllerFiles = this.changedFiles.filter(file => file.match(/Controller\.java$/));
+      controllerFiles = this.changedFiles.filter((file) => file.match(/Controller\.java$/));
       console.log('检测到的变更文件：');
-      controllerFiles.forEach(file => console.log(`- ${file}`));
+      controllerFiles.forEach((file) => console.log(`- ${file}`));
     } else {
       try {
         controllerFiles = globSync(`${sourcePath}/**/*Controller.java`);
@@ -342,7 +371,7 @@ export class ApiScanner {
 
       Object.keys(apiPatterns).forEach((method: string) => {
         const matches = [...content.matchAll((apiPatterns as any)[method])];
-        matches.forEach(match => {
+        matches.forEach((match) => {
           let apiPath = match[1];
           if (apiPath && !apiPath.startsWith('/')) {
             apiPath = '/' + apiPath;
@@ -358,7 +387,7 @@ export class ApiScanner {
             method: method,
             controller: fileName,
             file: file,
-            parameters: []
+            parameters: [],
           };
 
           // 确定当前方法的范围，只在该范围内匹配参数
@@ -370,10 +399,10 @@ export class ApiScanner {
           const pathParamPattern = /@PathVariable(?:\([^)]*\))?\s*\w+\s*(\w+)/g;
           const pathParamMatches = [...methodContent.matchAll(pathParamPattern)];
           if (pathParamMatches.length > 0) {
-            pathParamMatches.forEach(paramMatch => {
+            pathParamMatches.forEach((paramMatch) => {
               api.parameters?.push({
                 name: paramMatch[1],
-                type: 'path'
+                type: 'path',
               });
             });
           }
@@ -382,10 +411,10 @@ export class ApiScanner {
           const queryParamPattern = /@RequestParam(?:\([^)]*\))?\s*\w+\s*(\w+)/g;
           const queryParamMatches = [...methodContent.matchAll(queryParamPattern)];
           if (queryParamMatches.length > 0) {
-            queryParamMatches.forEach(paramMatch => {
+            queryParamMatches.forEach((paramMatch) => {
               api.parameters?.push({
                 name: paramMatch[1],
-                type: 'query'
+                type: 'query',
               });
             });
           }
@@ -403,8 +432,14 @@ export class ApiScanner {
           if (returnTypeMatch) {
             let returnType = returnTypeMatch[1];
             // 处理 JSON 对象类型
-            if (returnType && (returnType.includes('JSONObject') || returnType.includes('Map') || returnType.includes('HashMap') ||
-                returnType.includes('LinkedHashMap') || returnType.includes('TreeMap'))) {
+            if (
+              returnType &&
+              (returnType.includes('JSONObject') ||
+                returnType.includes('Map') ||
+                returnType.includes('HashMap') ||
+                returnType.includes('LinkedHashMap') ||
+                returnType.includes('TreeMap'))
+            ) {
               api.returnType = 'JSONObject';
             } else {
               api.returnType = this.inferGenericTypes(returnType!, methodContent, api);
@@ -502,25 +537,25 @@ export class ApiScanner {
     const routes: ApiInfo[] = [];
     // 支持 app.get/router.get/express.Router() 等多种模式
     const routePatterns = {
-      'get': /(?:app|router|Route)\.get\s*\(\s*["'`]([^"'`]*)["'`]/g,
-      'post': /(?:app|router|Route)\.post\s*\(\s*["'`]([^"'`]*)["'`]/g,
-      'put': /(?:app|router|Route)\.put\s*\(\s*["'`]([^"'`]*)["'`]/g,
-      'delete': /(?:app|router|Route)\.delete\s*\(\s*["'`]([^"'`]*)["'`]/g,
-      'patch': /(?:app|router|Route)\.patch\s*\(\s*["'`]([^"'`]*)["'`]/g
+      get: /(?:app|router|Route)\.get\s*\(\s*["'`]([^"'`]*)["'`]/g,
+      post: /(?:app|router|Route)\.post\s*\(\s*["'`]([^"'`]*)["'`]/g,
+      put: /(?:app|router|Route)\.put\s*\(\s*["'`]([^"'`]*)["'`]/g,
+      delete: /(?:app|router|Route)\.delete\s*\(\s*["'`]([^"'`]*)["'`]/g,
+      patch: /(?:app|router|Route)\.patch\s*\(\s*["'`]([^"'`]*)["'`]/g,
     };
 
     let routeFiles: string[];
 
     if (this.changedFiles.length > 0) {
       console.log('增量同步模式：只扫描变更的文件');
-      routeFiles = this.changedFiles.filter(file => file.match(/\.(js|ts)$/));
+      routeFiles = this.changedFiles.filter((file) => file.match(/\.(js|ts)$/));
     } else {
       try {
         routeFiles = globSync(`${sourcePath}/**/*{route,Route,router,Router,routes,Routes}*.{js,ts}`, {
-          ignore: ['**/node_modules/**']
+          ignore: ['**/node_modules/**'],
         });
         const indexFiles = globSync(`${sourcePath}/**/{index,app,server}.{js,ts}`, {
-          ignore: ['**/node_modules/**']
+          ignore: ['**/node_modules/**'],
         });
         routeFiles = [...new Set([...routeFiles, ...indexFiles])];
       } catch (error: any) {
@@ -535,15 +570,15 @@ export class ApiScanner {
       const content = fs.readFileSync(file, 'utf8');
       const fileName = path.basename(file);
 
-      Object.keys(routePatterns).forEach(method => {
+      Object.keys(routePatterns).forEach((method) => {
         const matches = [...content.matchAll((routePatterns as any)[method])];
-        matches.forEach(match => {
+        matches.forEach((match) => {
           const apiPath = match[1];
           routes.push({
             path: apiPath,
             method: method,
             controller: fileName,
-            file: file
+            file: file,
           });
         });
       });
@@ -558,17 +593,17 @@ export class ApiScanner {
   async scanDjangoCode(sourcePath: string): Promise<ApiInfo[]> {
     const views: ApiInfo[] = [];
     const urlPatterns = {
-      'get': /path\(\s*["']([^"']*)["'].*,.*views\./g,
-      'post': /path\(\s*["']([^"']*)["'].*,.*views\./g,
-      'put': /path\(\s*["']([^"']*)["'].*,.*views\./g,
-      'delete': /path\(\s*["']([^"']*)["'].*,.*views\./g
+      get: /path\(\s*["']([^"']*)["'].*,.*views\./g,
+      post: /path\(\s*["']([^"']*)["'].*,.*views\./g,
+      put: /path\(\s*["']([^"']*)["'].*,.*views\./g,
+      delete: /path\(\s*["']([^"']*)["'].*,.*views\./g,
     };
 
     let urlFiles: string[];
 
     if (this.changedFiles.length > 0) {
       console.log('增量同步模式：只扫描变更的文件');
-      urlFiles = this.changedFiles.filter(file => file.match(/urls\.py$/));
+      urlFiles = this.changedFiles.filter((file) => file.match(/urls\.py$/));
     } else {
       try {
         urlFiles = globSync(`${sourcePath}/**/urls.py`);
@@ -584,15 +619,15 @@ export class ApiScanner {
       const content = fs.readFileSync(file, 'utf8');
       const fileName = path.basename(file);
 
-      Object.keys(urlPatterns).forEach(method => {
+      Object.keys(urlPatterns).forEach((method) => {
         const matches = [...content.matchAll((urlPatterns as any)[method])];
-        matches.forEach(match => {
+        matches.forEach((match) => {
           const apiPath = match[1];
           views.push({
             path: `/${apiPath}`,
             method: method,
             controller: fileName,
-            file: file
+            file: file,
           });
         });
       });
@@ -607,15 +642,13 @@ export class ApiScanner {
   async scanCodeByFramework(sourcePath: string, framework: string): Promise<ApiInfo[]> {
     const config = FRAMEWORK_CONFIGS[framework];
     if (!config) {
-      const error = ErrorHandler.createCustomError(
-        'UNSUPPORTED_FRAMEWORK',
-        `不支持的框架类型: ${framework}`,
-        { framework }
-      );
+      const error = ErrorHandler.createCustomError('UNSUPPORTED_FRAMEWORK', `不支持的框架类型: ${framework}`, {
+        framework,
+      });
       ErrorHandler.handleValidationError([error]);
       ErrorHandler.logError(error, {
         framework,
-        operation: 'scanCodeForChanges'
+        operation: 'scanCodeForChanges',
       });
       throw error;
     }
@@ -630,9 +663,9 @@ export class ApiScanner {
     let files: string[];
     if (this.changedFiles.length > 0) {
       console.log('增量同步模式：只扫描变更的文件');
-      files = this.changedFiles.filter(file => {
+      files = this.changedFiles.filter((file) => {
         // 检查文件是否匹配框架的文件扩展名
-        return config.fileExts.some(ext => file.endsWith(ext));
+        return config.fileExts.some((ext) => file.endsWith(ext));
       });
     } else {
       try {
@@ -670,9 +703,9 @@ export class ApiScanner {
         }
       }
 
-      Object.keys(config.methodPatterns).forEach(method => {
+      Object.keys(config.methodPatterns).forEach((method) => {
         const matches = [...content.matchAll(config.methodPatterns[method])];
-        matches.forEach(match => {
+        matches.forEach((match) => {
           let apiPath = match[1];
 
           // 规范化路径
@@ -690,7 +723,7 @@ export class ApiScanner {
             method: method,
             controller: fileName,
             file: file,
-            parameters: []
+            parameters: [],
           };
 
           // 根据框架类型解析额外信息
@@ -721,10 +754,10 @@ export class ApiScanner {
     const pathParamPattern = /@PathVariable(?:\([^)]*\))?\s*\w+\s*(\w+)/g;
     const pathParamMatches = [...methodContent.matchAll(pathParamPattern)];
     if (pathParamMatches.length > 0) {
-      pathParamMatches.forEach(paramMatch => {
+      pathParamMatches.forEach((paramMatch) => {
         api.parameters?.push({
           name: paramMatch[1],
-          type: 'path'
+          type: 'path',
         });
       });
     }
@@ -733,10 +766,10 @@ export class ApiScanner {
     const queryParamPattern = /@RequestParam(?:\([^)]*\))?\s*\w+\s*(\w+)/g;
     const queryParamMatches = [...methodContent.matchAll(queryParamPattern)];
     if (queryParamMatches.length > 0) {
-      queryParamMatches.forEach(paramMatch => {
+      queryParamMatches.forEach((paramMatch) => {
         api.parameters?.push({
           name: paramMatch[1],
-          type: 'query'
+          type: 'query',
         });
       });
     }
@@ -765,19 +798,53 @@ export class ApiScanner {
         api.mapFields = mapFields;
       }
     }
+
+    // 提取响应字段列表（用于对比）
+    api.responseFields = this.extractResponseFieldNames(api);
+  }
+
+  /**
+   * 根据返回类型提取响应字段名列表
+   */
+  extractResponseFieldNames(api: ApiInfo): string[] {
+    const fields: string[] = [];
+
+    // 优先从 mapFields 提取
+    if (api.mapFields && Object.keys(api.mapFields).length > 0) {
+      fields.push(...Object.keys(api.mapFields));
+    }
+
+    // 从 DTO Schema 提取（使用 baseType 或 returnType）
+    const dtoType = api.baseType || api.returnType;
+    if (dtoType) {
+      // 处理泛型，如 List<UserDTO> -> UserDTO
+      const genericMatch = dtoType.match(/^(?:List|Set|Collection)<(.+)>$/);
+      const typeName = genericMatch ? genericMatch[1] : dtoType;
+
+      if (this.dtoSchemas[typeName]) {
+        const dtoFields = Object.keys(this.dtoSchemas[typeName]);
+        dtoFields.forEach((f) => {
+          if (!fields.includes(f)) {
+            fields.push(f);
+          }
+        });
+      }
+    }
+
+    return fields;
   }
 
   /**
    * 解析 Node.js API 详情
    */
-  parseNodeJsApiDetails(content: string, api: ApiInfo, startIndex: number): void {
+  parseNodeJsApiDetails(_content: string, _api: ApiInfo, _startIndex: number): void {
     // Node.js 简单解析，主要获取路径和方法
   }
 
   /**
    * 解析 Django API 详情
    */
-  parseDjangoApiDetails(content: string, api: ApiInfo, startIndex: number): void {
+  parseDjangoApiDetails(_content: string, _api: ApiInfo, _startIndex: number): void {
     // Django 简单解析，主要获取路径和方法
   }
 

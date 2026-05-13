@@ -28,7 +28,7 @@ class ApifoxMCP {
     try {
       if (fs.existsSync(this.credentialsPath)) {
         const credentials = JSON.parse(fs.readFileSync(this.credentialsPath, 'utf8'));
-        Object.keys(credentials).forEach(projectName => {
+        Object.keys(credentials).forEach((projectName) => {
           this.connections.set(projectName, credentials[projectName]);
         });
         console.log(`已加载 ${this.connections.size} 个项目的连接信息`);
@@ -57,14 +57,16 @@ class ApifoxMCP {
 
     // 验证连接
     try {
-      const response = await retryRequest(() => axios.get(`${this.baseUrl}/v1/projects/${projectId}/info`, {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'X-Apifox-Api-Version': '2024-03-28'
-        },
-        timeout: 60000
-      }));
+      const response = await retryRequest(() =>
+        axios.get(`${this.baseUrl}/v1/projects/${projectId}/info`, {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'X-Apifox-Api-Version': '2024-03-28',
+          },
+          timeout: 60000,
+        }),
+      );
 
       if (response.status === 200) {
         console.log('✅ 连接成功');
@@ -74,7 +76,7 @@ class ApifoxMCP {
           projectId,
           apiKey,
           projectInfo: response.data,
-          connectedAt: new Date()
+          connectedAt: new Date(),
         });
 
         // 保存凭据
@@ -135,22 +137,28 @@ class ApifoxMCP {
     }
 
     try {
-      const response = await retryRequest(() => axios.post(`${this.baseUrl}/v1/projects/${connectionInfo.projectId}/export-openapi`, {
-        scope: { type: 'ALL' },
-        options: {
-          includeApifoxExtensionProperties: false,
-          addFoldersToTags: false
-        },
-        oasVersion: '3.1',
-        exportFormat: 'JSON'
-      }, {
-        headers: {
-          'Authorization': `Bearer ${connectionInfo.apiKey}`,
-          'Content-Type': 'application/json',
-          'X-Apifox-Api-Version': '2024-03-28'
-        },
-        timeout: 60000
-      }));
+      const response = await retryRequest(() =>
+        axios.post(
+          `${this.baseUrl}/v1/projects/${connectionInfo.projectId}/export-openapi`,
+          {
+            scope: { type: 'ALL' },
+            options: {
+              includeApifoxExtensionProperties: false,
+              addFoldersToTags: false,
+            },
+            oasVersion: '3.1',
+            exportFormat: 'JSON',
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${connectionInfo.apiKey}`,
+              'Content-Type': 'application/json',
+              'X-Apifox-Api-Version': '2024-03-28',
+            },
+            timeout: 60000,
+          },
+        ),
+      );
 
       if (response.data) {
         const openApiDoc = response.data;
@@ -162,14 +170,14 @@ class ApifoxMCP {
 
         const apis: any[] = [];
         if (openApiDoc.paths) {
-          Object.keys(openApiDoc.paths).forEach(path => {
+          Object.keys(openApiDoc.paths).forEach((path) => {
             const methods = openApiDoc.paths[path];
-            Object.keys(methods).forEach(method => {
+            Object.keys(methods).forEach((method) => {
               apis.push({
                 path: path,
                 method: method.toLowerCase(),
                 summary: methods[method].summary || '未命名接口',
-                description: methods[method].description || ''
+                description: methods[method].description || '',
               });
             });
           });
@@ -195,18 +203,20 @@ class ApifoxMCP {
     }
 
     try {
-      const response = await retryRequest(() => axios.get(`${this.baseUrl}/v1/projects/${connectionInfo.projectId}/documents`, {
-        headers: {
-          'Authorization': `Bearer ${connectionInfo.apiKey}`,
-          'Content-Type': 'application/json',
-          'X-Apifox-Api-Version': '2024-03-28'
-        },
-        timeout: 60000
-      }));
+      const response = await retryRequest(() =>
+        axios.get(`${this.baseUrl}/v1/projects/${connectionInfo.projectId}/documents`, {
+          headers: {
+            Authorization: `Bearer ${connectionInfo.apiKey}`,
+            'Content-Type': 'application/json',
+            'X-Apifox-Api-Version': '2024-03-28',
+          },
+          timeout: 60000,
+        }),
+      );
 
       if (response.status === 200) {
         // 确保返回数组类型
-        return Array.isArray(response.data) ? response.data : (response.data.documents || []);
+        return Array.isArray(response.data) ? response.data : response.data.documents || [];
       }
 
       return [];
@@ -227,18 +237,20 @@ class ApifoxMCP {
     }
 
     try {
-      const response = await retryRequest(() => axios.get(`${this.baseUrl}/v1/projects/${connectionInfo.projectId}/environments`, {
-        headers: {
-          'Authorization': `Bearer ${connectionInfo.apiKey}`,
-          'Content-Type': 'application/json',
-          'X-Apifox-Api-Version': '2024-03-28'
-        },
-        timeout: 60000
-      }));
+      const response = await retryRequest(() =>
+        axios.get(`${this.baseUrl}/v1/projects/${connectionInfo.projectId}/environments`, {
+          headers: {
+            Authorization: `Bearer ${connectionInfo.apiKey}`,
+            'Content-Type': 'application/json',
+            'X-Apifox-Api-Version': '2024-03-28',
+          },
+          timeout: 60000,
+        }),
+      );
 
       if (response.status === 200) {
         // 确保返回数组类型
-        return Array.isArray(response.data) ? response.data : (response.data.environments || []);
+        return Array.isArray(response.data) ? response.data : response.data.environments || [];
       }
 
       return [];
@@ -259,18 +271,20 @@ class ApifoxMCP {
     }
 
     try {
-      const response = await retryRequest(() => axios.get(`${this.baseUrl}/v1/projects/${connectionInfo.projectId}/variables`, {
-        headers: {
-          'Authorization': `Bearer ${connectionInfo.apiKey}`,
-          'Content-Type': 'application/json',
-          'X-Apifox-Api-Version': '2024-03-28'
-        },
-        timeout: 60000
-      }));
+      const response = await retryRequest(() =>
+        axios.get(`${this.baseUrl}/v1/projects/${connectionInfo.projectId}/variables`, {
+          headers: {
+            Authorization: `Bearer ${connectionInfo.apiKey}`,
+            'Content-Type': 'application/json',
+            'X-Apifox-Api-Version': '2024-03-28',
+          },
+          timeout: 60000,
+        }),
+      );
 
       if (response.status === 200) {
         // 确保返回数组类型
-        return Array.isArray(response.data) ? response.data : (response.data.variables || []);
+        return Array.isArray(response.data) ? response.data : response.data.variables || [];
       }
 
       return [];
@@ -291,14 +305,16 @@ class ApifoxMCP {
     }
 
     try {
-      const response = await retryRequest(() => axios.get(`${this.baseUrl}/v1/projects/${connectionInfo.projectId}/info`, {
-        headers: {
-          'Authorization': `Bearer ${connectionInfo.apiKey}`,
-          'Content-Type': 'application/json',
-          'X-Apifox-Api-Version': '2024-03-28'
-        },
-        timeout: 60000
-      }));
+      const response = await retryRequest(() =>
+        axios.get(`${this.baseUrl}/v1/projects/${connectionInfo.projectId}/info`, {
+          headers: {
+            Authorization: `Bearer ${connectionInfo.apiKey}`,
+            'Content-Type': 'application/json',
+            'X-Apifox-Api-Version': '2024-03-28',
+          },
+          timeout: 60000,
+        }),
+      );
 
       return response.status === 200;
     } catch (error) {

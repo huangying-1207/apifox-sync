@@ -5,7 +5,7 @@ import apifoxMCP from './apifox';
 
 const rl = readline.createInterface({
   input: process.stdin,
-  output: process.stdout
+  output: process.stdout,
 });
 
 class MCPCommandHandler {
@@ -13,16 +13,16 @@ class MCPCommandHandler {
 
   constructor() {
     this.commands = {
-      'connect': this.handleConnect.bind(this),
-      'disconnect': this.handleDisconnect.bind(this),
-      'status': this.handleStatus.bind(this),
-      'projects': this.handleListProjects.bind(this),
-      'info': this.handleProjectInfo.bind(this),
-      'apis': this.handleGetApis.bind(this),
-      'documents': this.handleGetDocuments.bind(this),
-      'environments': this.handleGetEnvironments.bind(this),
-      'variables': this.handleGetVariables.bind(this),
-      'help': this.handleHelp.bind(this)
+      connect: this.handleConnect.bind(this),
+      disconnect: this.handleDisconnect.bind(this),
+      status: this.handleStatus.bind(this),
+      projects: this.handleListProjects.bind(this),
+      info: this.handleProjectInfo.bind(this),
+      apis: this.handleGetApis.bind(this),
+      documents: this.handleGetDocuments.bind(this),
+      environments: this.handleGetEnvironments.bind(this),
+      variables: this.handleGetVariables.bind(this),
+      help: this.handleHelp.bind(this),
     };
   }
 
@@ -65,14 +65,14 @@ class MCPCommandHandler {
     apifoxMCP.disconnect(projectName);
   }
 
-  handleStatus(args: string[]): void {
+  handleStatus(_args: string[]): void {
     const connectedProjects = apifoxMCP.getConnectedProjects();
 
     if (connectedProjects.length === 0) {
       console.log('未连接到任何 Apifox 项目');
     } else {
       console.log('当前连接的 Apifox 项目:');
-      connectedProjects.forEach(projectName => {
+      connectedProjects.forEach((projectName) => {
         const info = apifoxMCP.getConnectionInfo(projectName);
         console.log(`- ${projectName}`);
         console.log(`  项目ID: ${info.projectId}`);
@@ -305,7 +305,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(error => {
+main().catch((error) => {
   console.error('执行命令时出错:', error);
   rl.close();
   process.exit(1);

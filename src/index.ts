@@ -9,7 +9,6 @@ import ApiFormatter from './modules/formatter';
 import ApifoxSyncer from './modules/syncer';
 import { ErrorHandler } from './utils/errorHandler';
 import { ConfigValidator } from './utils/configValidator';
-import { Config } from './types';
 
 class ApifoxSync {
   private scanner: ApiScanner;
@@ -62,7 +61,7 @@ class ApifoxSync {
 
     const config = configManager.readConfig();
     if (config) {
-      Object.keys(config).forEach(key => {
+      Object.keys(config).forEach((key) => {
         if (parsed[key] === undefined) {
           parsed[key] = (config as any)[key];
         }
@@ -99,16 +98,20 @@ class ApifoxSync {
 
     if (validationErrors.length > 0) {
       console.error('参数验证失败:');
-      validationErrors.forEach(error => {
+      validationErrors.forEach((error) => {
         console.error(`- ${error.message}`);
       });
 
       if (commands === 'sync') {
         console.log('\nUsage:');
         console.log('  从 Swagger 同步:');
-        console.log('    api-sync-to-apifox sync --apifox-project-id <id> --apifox-api-key <key> --source-type swagger --source-path <url>');
+        console.log(
+          '    api-sync-to-apifox sync --apifox-project-id <id> --apifox-api-key <key> --source-type swagger --source-path <url>',
+        );
         console.log('  从代码同步:');
-        console.log('    api-sync-to-apifox sync --apifox-project-id <id> --apifox-api-key <key> --source-type code --source-path <dir> --framework <springboot|nodejs|django>');
+        console.log(
+          '    api-sync-to-apifox sync --apifox-project-id <id> --apifox-api-key <key> --source-type code --source-path <dir> --framework <springboot|nodejs|django>',
+        );
         console.log('');
         console.log('Options:');
         console.log('  --trigger-mode <auto|manual> 触发模式 (默认: auto)');
@@ -118,9 +121,13 @@ class ApifoxSync {
       } else if (commands === 'scan') {
         console.log('\nUsage:');
         console.log('  扫描所有接口:');
-        console.log('    api-sync-to-apifox scan --source-type code --source-path <dir> --framework <springboot|nodejs|django> --scan-type all');
+        console.log(
+          '    api-sync-to-apifox scan --source-type code --source-path <dir> --framework <springboot|nodejs|django> --scan-type all',
+        );
         console.log('  只扫描变更接口:');
-        console.log('    api-sync-to-apifox scan --source-type code --source-path <dir> --framework <springboot|nodejs|django> --scan-type changed');
+        console.log(
+          '    api-sync-to-apifox scan --source-type code --source-path <dir> --framework <springboot|nodejs|django> --scan-type changed',
+        );
         console.log('  扫描文档变更:');
         console.log('    api-sync-to-apifox scan --source-type swagger --source-path <url>');
       }
@@ -140,10 +147,10 @@ class ApifoxSync {
       const {
         'source-type': sourceType,
         'source-path': sourcePath,
-        'framework': framework,
+        framework: framework,
         'scan-type': scanType,
         'apifox-project-id': projectId,
-        'apifox-api-key': apiKey
+        'apifox-api-key': apiKey,
       } = args;
 
       if (projectId && apiKey) {
@@ -171,14 +178,17 @@ class ApifoxSync {
             console.log(`\n需要格式化的接口：${unformattedCount}个接口的字段说明需要格式化为中文`);
           }
 
-          const hasChanges = this.comparer.scanResults.added.length > 0 || this.comparer.scanResults.updated.length > 0 || this.comparer.scanResults.removed.length > 0;
+          const hasChanges =
+            this.comparer.scanResults.added.length > 0 ||
+            this.comparer.scanResults.updated.length > 0 ||
+            this.comparer.scanResults.removed.length > 0;
           if (hasChanges) {
             console.log(`\n🚨 检测到接口变更！请执行 npm run sync 命令进行同步`);
           }
         } else {
           if (scanType === 'changed' && this.scanner.getChangedFiles().length > 0) {
             console.log(`只扫描变更的 ${detectedApis.length} 个接口:`);
-            detectedApis.forEach(api => {
+            detectedApis.forEach((api) => {
               console.log(`  ${api.method.toUpperCase()} ${api.path} (${api.controller})`);
             });
 
@@ -190,7 +200,7 @@ class ApifoxSync {
           } else if (scanType === 'all') {
             console.log(`发现接口: ${detectedApis.length}个`);
             console.log(`接口详情:`);
-            detectedApis.forEach(api => {
+            detectedApis.forEach((api) => {
               console.log(`  ${api.method.toUpperCase()} ${api.path} (${api.controller})`);
             });
 
@@ -250,11 +260,11 @@ class ApifoxSync {
         'apifox-api-key': apiKey,
         'source-type': sourceType,
         'source-path': sourcePath,
-        'framework': framework,
+        framework: framework,
         'sync-mode': syncMode,
         'api-path': apiPath,
         'api-method': apiMethod,
-        'apis': apisParam
+        apis: apisParam,
       } = args;
 
       let openApiDoc: any;
@@ -295,11 +305,15 @@ class ApifoxSync {
               const existingApis = await this.syncer.getApifoxExistingApis(projectId, apiKey);
               this.comparer.compareApiChanges(detectedApis, existingApis);
 
-              if (this.comparer.scanResults.added.length > 0 || this.comparer.scanResults.updated.length > 0 || this.comparer.scanResults.removed.length > 0) {
+              if (
+                this.comparer.scanResults.added.length > 0 ||
+                this.comparer.scanResults.updated.length > 0 ||
+                this.comparer.scanResults.removed.length > 0
+              ) {
                 const readline = require('readline');
                 const rl = readline.createInterface({
                   input: process.stdin,
-                  output: process.stdout
+                  output: process.stdout,
                 });
 
                 rl.question('\n是否继续同步以上接口变更？(y/N): ', (answer: string) => {
@@ -324,10 +338,12 @@ class ApifoxSync {
               console.log('未连接到 Apifox 项目，将生成并格式化接口文档');
               console.log(`发现接口: ${detectedApis.length}个`);
               console.log('接口详情:');
-              detectedApis.forEach(api => {
+              detectedApis.forEach((api) => {
                 console.log(`  ${api.method.toUpperCase()} ${api.path} (${api.controller})`);
                 if (api.parameters && api.parameters.length > 0) {
-                  console.log(`    参数: ${api.parameters.map(param => param.name + '(' + param.type + ')').join(', ')}`);
+                  console.log(
+                    `    参数: ${api.parameters.map((param) => param.name + '(' + param.type + ')').join(', ')}`,
+                  );
                 }
               });
 
@@ -348,7 +364,6 @@ class ApifoxSync {
       this.syncer.saveDocToFile(formattedDoc, 'formatted-api-doc.json');
 
       this.performSync(formattedDoc, projectId, apiKey, syncMode);
-
     } catch (error) {
       console.error('\nError: 同步过程中发生意外错误');
       console.error((error as any).stack);
@@ -362,9 +377,10 @@ class ApifoxSync {
   async generateSingleApiDoc(sourcePath: string, framework: string, method: string, apiPath: string): Promise<any> {
     const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
     this.formatter.setDtoSchemas(this.scanner.getDtoSchemas());
-    const targetApi = detectedApis.find(api =>
-      api.method.toLowerCase() === method.toLowerCase() &&
-      (api.path === apiPath || api.path === apiPath + '/' || api.path === apiPath.replace(/\/$/, ''))
+    const targetApi = detectedApis.find(
+      (api) =>
+        api.method.toLowerCase() === method.toLowerCase() &&
+        (api.path === apiPath || api.path === apiPath + '/' || api.path === apiPath.replace(/\/$/, '')),
     );
 
     if (!targetApi) {
@@ -384,11 +400,14 @@ class ApifoxSync {
     const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
     this.formatter.setDtoSchemas(this.scanner.getDtoSchemas());
 
-    const apiList = apisParam.split(',').map(item => {
-      const parts = item.trim().split(':');
-      if (parts.length < 2) return null;
-      return { method: parts[0].trim(), path: parts.slice(1).join(':').trim() };
-    }).filter(Boolean);
+    const apiList = apisParam
+      .split(',')
+      .map((item) => {
+        const parts = item.trim().split(':');
+        if (parts.length < 2) return null;
+        return { method: parts[0].trim(), path: parts.slice(1).join(':').trim() };
+      })
+      .filter(Boolean);
 
     if (apiList.length === 0) {
       console.log('无效的接口列表格式，正确格式: "GET:/api/users,POST:/api/orders"');
@@ -399,9 +418,12 @@ class ApifoxSync {
     const notFound: string[] = [];
 
     for (const apiSpec of apiList as any[]) {
-      const matched = detectedApis.find(api =>
-        api.method.toLowerCase() === apiSpec.method.toLowerCase() &&
-        (api.path === apiSpec.path || api.path === apiSpec.path + '/' || api.path === apiSpec.path.replace(/\/$/, ''))
+      const matched = detectedApis.find(
+        (api) =>
+          api.method.toLowerCase() === apiSpec.method.toLowerCase() &&
+          (api.path === apiSpec.path ||
+            api.path === apiSpec.path + '/' ||
+            api.path === apiSpec.path.replace(/\/$/, '')),
       );
 
       if (matched) {
@@ -420,7 +442,7 @@ class ApifoxSync {
     }
 
     console.log(`找到 ${targetApis.length} 个指定接口:`);
-    targetApis.forEach(api => {
+    targetApis.forEach((api) => {
       console.log(`  ${api.method.toUpperCase()} ${api.path}`);
     });
 
@@ -430,17 +452,30 @@ class ApifoxSync {
   /**
    * 执行实际同步操作
    */
-  async performSync(formattedDoc: any, projectId: string, apiKey: string, syncMode: string, detectedApis: any[] = [], existingApis: any[] = []): Promise<void> {
+  async performSync(
+    formattedDoc: any,
+    projectId: string,
+    apiKey: string,
+    syncMode: string,
+    detectedApis: any[] = [],
+    existingApis: any[] = [],
+  ): Promise<void> {
     try {
       // 如果连接到 Apifox 项目，同步接口
       if (projectId && apiKey) {
-        const result = await this.syncer.syncToApifox(formattedDoc, projectId, apiKey);
+        await this.syncer.syncToApifox(formattedDoc, projectId, apiKey);
 
         console.log('\n=== 同步完成 ===');
         console.log('✅ 后端接口已成功同步到 Apifox');
         console.log('✅ 所有字段说明已格式化为中文');
 
-        if (syncMode === 'incremental' && Object.keys(this.comparer.scanResults).length > 0 && (this.comparer.scanResults.added.length > 0 || this.comparer.scanResults.updated.length > 0 || this.comparer.scanResults.removed.length > 0)) {
+        if (
+          syncMode === 'incremental' &&
+          Object.keys(this.comparer.scanResults).length > 0 &&
+          (this.comparer.scanResults.added.length > 0 ||
+            this.comparer.scanResults.updated.length > 0 ||
+            this.comparer.scanResults.removed.length > 0)
+        ) {
           this.comparer.outputChangeDetails(detectedApis, existingApis);
         } else if (syncMode === 'full') {
           console.log('全量更新模式：所有接口已同步');
@@ -453,7 +488,6 @@ class ApifoxSync {
         console.log('❌ 未连接到 Apifox 项目，无法同步接口');
         console.log('请使用 mcp connect 命令连接到 Apifox 项目后再次执行同步命令');
       }
-
     } catch (error) {
       console.error('\nError: 同步过程中发生意外错误');
       console.error((error as any).stack);
@@ -473,7 +507,7 @@ async function main(): Promise<void> {
     try {
       const helpContent = fs.readFileSync(path.join(__dirname, '../help.txt'), 'utf8');
       console.log(helpContent);
-    } catch (error) {
+    } catch (_error) {
       console.log('=== Apifox 同步技能帮助 ===');
       console.log('');
       console.log('可用命令：');
@@ -500,7 +534,7 @@ async function main(): Promise<void> {
     const { spawn } = require('child_process');
     const mcpProcess = spawn('node', ['src/mcp/mcp-server.js', ...process.argv.slice(3)], {
       stdio: 'inherit',
-      shell: true
+      shell: true,
     });
 
     mcpProcess.on('close', (code: number) => {
@@ -514,7 +548,45 @@ async function main(): Promise<void> {
     const configArgs = process.argv.slice(3);
 
     if (configArgs.length > 0 && configArgs[0] === 'init') {
-      configManager.createDefaultConfig();
+      // Parse init-specific args
+      const initArgs: any = {};
+      for (let i = 1; i < configArgs.length; i++) {
+        if (configArgs[i].startsWith('--') && i + 1 < configArgs.length && !configArgs[i + 1].startsWith('--')) {
+          initArgs[configArgs[i].slice(2)] = configArgs[i + 1];
+          i++;
+        }
+      }
+
+      // Read credentials to auto-populate project info
+      const apifoxMCP = require('./mcp/apifox').default;
+      const connectedProjects = apifoxMCP.getConnectedProjects();
+
+      if (connectedProjects.length > 0) {
+        const projectName = connectedProjects[0];
+        const connectionInfo = apifoxMCP.getConnectionInfo(projectName);
+        initArgs['project-name'] = projectName;
+        initArgs['apifox-project-id'] = connectionInfo.projectId;
+        initArgs['apifox-api-key'] = connectionInfo.apiKey;
+        console.log(`已从凭据中加载项目 "${projectName}" 的连接信息`);
+      } else {
+        console.warn('未检测到 MCP 连接信息，请先执行 `node dist/index.js mcp connect <项目名> <项目ID> <API密钥>` 连接 Apifox 项目');
+        console.warn('配置文件将使用默认值生成，apifox-project-id 和 apifox-api-key 为空');
+      }
+
+      // Generate default config and merge with provided args
+      const defaultConfig = ConfigValidator.generateDefaultConfig();
+      const mergedConfig = { ...defaultConfig, ...initArgs };
+      configManager.setConfig('apifox-project-id', mergedConfig['apifox-project-id']);
+      configManager.setConfig('apifox-api-key', mergedConfig['apifox-api-key']);
+      if (mergedConfig['project-name']) configManager.setConfig('project-name', mergedConfig['project-name']);
+      if (mergedConfig['source-type']) configManager.setConfig('source-type', mergedConfig['source-type']);
+      if (mergedConfig['source-path']) configManager.setConfig('source-path', mergedConfig['source-path']);
+      if (mergedConfig['framework']) configManager.setConfig('framework', mergedConfig['framework']);
+      if (mergedConfig['sync-mode']) configManager.setConfig('sync-mode', mergedConfig['sync-mode']);
+      if (mergedConfig['scan-type']) configManager.setConfig('scan-type', mergedConfig['scan-type']);
+      if (mergedConfig['trigger-mode']) configManager.setConfig('trigger-mode', mergedConfig['trigger-mode']);
+      configManager.saveConfig();
+      console.log(`配置文件已更新: ${path.join(process.cwd(), '.apifoxsync.json')}`);
     } else {
       console.log('=== Apifox 同步技能配置 ===');
       console.log('');
@@ -546,7 +618,7 @@ async function main(): Promise<void> {
     try {
       const helpContent = fs.readFileSync(path.join(__dirname, '../help.txt'), 'utf8');
       console.log(helpContent);
-    } catch (error) {
+    } catch (_error) {
       console.log('=== Apifox 同步技能帮助 ===');
       console.log('');
       console.log('可用命令：');
@@ -583,11 +655,11 @@ async function main(): Promise<void> {
 }
 
 // 执行主程序
-main().catch(error => {
+main().catch((error) => {
   console.error('=== 执行错误 ===');
   ErrorHandler.handleUnexpectedError(error);
   ErrorHandler.logError(error, {
-    operation: 'main'
+    operation: 'main',
   });
   process.exit(1);
 });

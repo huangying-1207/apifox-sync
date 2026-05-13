@@ -33,7 +33,7 @@ class ConfigManager {
       path.join(process.cwd(), '.apifoxsync.json'),
       path.join(process.cwd(), '.claude', 'apifoxsync.json'),
       path.join(process.cwd(), 'config', 'apifoxsync.json'),
-      path.join(process.env.HOME || process.env.USERPROFILE || '', '.apifoxsync.json')
+      path.join(process.env.HOME || process.env.USERPROFILE || '', '.apifoxsync.json'),
     ];
 
     for (const configPath of possiblePaths) {
@@ -62,14 +62,11 @@ class ConfigManager {
 
       const validationErrors = this.validateConfig();
       if (validationErrors.length > 0) {
-        ErrorHandler.logError(
-          new Error('配置验证失败'),
-          {
-            operation: 'readConfig',
-            configPath: this.configPath,
-            errors: validationErrors
-          }
-        );
+        ErrorHandler.logError(new Error('配置验证失败'), {
+          operation: 'readConfig',
+          configPath: this.configPath,
+          errors: validationErrors,
+        });
       }
 
       return this.config;
@@ -77,7 +74,7 @@ class ConfigManager {
       ErrorHandler.handleFileError(error, this.configPath!);
       ErrorHandler.logError(error, {
         operation: 'readConfig',
-        configPath: this.configPath
+        configPath: this.configPath,
       });
       return null;
     }

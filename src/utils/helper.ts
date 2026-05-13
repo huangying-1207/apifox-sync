@@ -17,14 +17,18 @@ export function convertToCamelCase(name: string): string {
 // 获取默认接口摘要
 export function getDefaultSummary(path: string, method: string): string {
   const methodMap: Record<string, string> = {
-    'get': '查询',
-    'post': '新增',
-    'put': '更新',
-    'delete': '删除',
-    'patch': '修改'
+    get: '查询',
+    post: '新增',
+    put: '更新',
+    delete: '删除',
+    patch: '修改',
   };
 
-  const resource = path.split('/').filter(part => part && !part.startsWith('{')).pop() || '数据';
+  const resource =
+    path
+      .split('/')
+      .filter((part) => part && !part.startsWith('{'))
+      .pop() || '数据';
   return `${methodMap[method.toLowerCase()] || '操作'}${resource}`;
 }
 
@@ -48,7 +52,7 @@ export function getDefaultResponseDescription(statusCode: string): string {
     '401': '未授权',
     '403': '禁止访问',
     '404': '资源不存在',
-    '500': '服务器错误'
+    '500': '服务器错误',
   };
 
   return statusMap[statusCode] || '响应';
@@ -63,7 +67,7 @@ export function normalizePath(path: string): string {
 export async function retryRequest<T>(
   requestFn: () => Promise<T>,
   retries: number = 3,
-  delay: number = 1000
+  delay: number = 1000,
 ): Promise<T> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -72,7 +76,7 @@ export async function retryRequest<T>(
       const isRetryable = !error.response || (error.response.status >= 500 && error.response.status < 600);
       if (isRetryable && attempt < retries) {
         console.warn(`请求失败 (尝试 ${attempt}/${retries})，${delay}ms 后重试...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
         delay *= 2;
         continue;
       }

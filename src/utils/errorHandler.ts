@@ -23,7 +23,7 @@ export class ErrorHandler {
         404: '资源不存在，请检查项目 ID 是否正确',
         429: '请求频率超限，请稍后重试',
         500: '服务器内部错误，请稍后重试',
-        503: '服务器维护中，请稍后重试'
+        503: '服务器维护中，请稍后重试',
       };
 
       if (errorTypes[error.response.status]) {
@@ -53,7 +53,7 @@ export class ErrorHandler {
       EACCES: '  - 权限不足',
       EISDIR: '  - 路径是目录而不是文件',
       ENOTDIR: '  - 目标路径不是目录',
-      EEXIST: '  - 文件已存在'
+      EEXIST: '  - 文件已存在',
     };
 
     if (errorCodes[error.code]) {
@@ -90,7 +90,7 @@ export class ErrorHandler {
     const errorCodes: Record<string, string> = {
       ENOENT: '  - 源代码目录不存在',
       EACCES: '  - 无法访问源代码目录',
-      ENOTDIR: '  - 路径不是有效的目录'
+      ENOTDIR: '  - 路径不是有效的目录',
     };
 
     if (errorCodes[error.code]) {
@@ -110,7 +110,7 @@ export class ErrorHandler {
     const errorCodes: Record<string, string> = {
       API_RATE_LIMIT: '  - API 请求频率超限，请稍后重试',
       API_CONNECTION: '  - 无法连接到 Apifox 服务器',
-      TIMEOUT: '  - 请求超时，请检查网络连接'
+      TIMEOUT: '  - 请求超时，请检查网络连接',
     };
 
     if (errorCodes[error.code]) {
@@ -125,7 +125,7 @@ export class ErrorHandler {
    */
   static handleValidationError(errors: any[]) {
     console.error('❌ 参数验证失败');
-    errors.forEach(error => {
+    errors.forEach((error) => {
       console.error(`  - ${error.message}`);
     });
   }
@@ -159,7 +159,7 @@ export class ErrorHandler {
       type: error.type || 'UNEXPECTED',
       message: error.message,
       timestamp: new Date().toISOString(),
-      stack: error.stack
+      stack: error.stack,
     };
 
     if (error.code) {
@@ -190,7 +190,7 @@ export class ErrorHandler {
     const logEntry = {
       timestamp: new Date().toISOString(),
       context,
-      error: this.formatError(error)
+      error: this.formatError(error),
     };
 
     try {

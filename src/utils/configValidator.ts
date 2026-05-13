@@ -2,8 +2,6 @@
  * 配置验证工具
  */
 
-import fs from 'fs';
-import path from 'path';
 import { Config } from '../types';
 
 export class ConfigValidator {
@@ -16,16 +14,13 @@ export class ConfigValidator {
     if (!config) {
       errors.push({
         type: 'missing_config',
-        message: '配置对象不存在'
+        message: '配置对象不存在',
       });
       return errors;
     }
 
     // 验证必填字段
-    const requiredFields: string[] = [
-      'source-type',
-      'source-path'
-    ];
+    const requiredFields: string[] = ['source-type', 'source-path'];
 
     // 如果没有提供 project-name，则需要验证 apifox-project-id 和 apifox-api-key
     if (!config['project-name']) {
@@ -33,12 +28,12 @@ export class ConfigValidator {
       requiredFields.push('apifox-api-key');
     }
 
-    requiredFields.forEach(field => {
+    requiredFields.forEach((field) => {
       if (!config[field as keyof Config]) {
         errors.push({
           type: 'missing_field',
           field,
-          message: `缺少必填配置字段: ${field}`
+          message: `缺少必填配置字段: ${field}`,
         });
       }
     });
@@ -49,7 +44,7 @@ export class ConfigValidator {
         type: 'invalid_value',
         field: 'source-type',
         value: config['source-type'],
-        message: '无效的源类型，支持 code 或 swagger'
+        message: '无效的源类型，支持 code 或 swagger',
       });
     }
 
@@ -58,7 +53,7 @@ export class ConfigValidator {
       errors.push({
         type: 'missing_field',
         field: 'framework',
-        message: '当 source-type 为 code 时，需要指定 framework 字段'
+        message: '当 source-type 为 code 时，需要指定 framework 字段',
       });
     }
 
@@ -67,7 +62,7 @@ export class ConfigValidator {
         type: 'invalid_value',
         field: 'framework',
         value: config['framework'],
-        message: '无效的框架类型，支持 springboot、nodejs 或 django'
+        message: '无效的框架类型，支持 springboot、nodejs 或 django',
       });
     }
 
@@ -77,7 +72,7 @@ export class ConfigValidator {
         type: 'invalid_value',
         field: 'sync-mode',
         value: config['sync-mode'],
-        message: '无效的同步模式，支持 incremental 或 full'
+        message: '无效的同步模式，支持 incremental 或 full',
       });
     }
 
@@ -87,7 +82,7 @@ export class ConfigValidator {
         type: 'invalid_value',
         field: 'trigger-mode',
         value: config['trigger-mode'],
-        message: '无效的触发模式，支持 auto 或 manual'
+        message: '无效的触发模式，支持 auto 或 manual',
       });
     }
 
@@ -97,7 +92,7 @@ export class ConfigValidator {
         type: 'invalid_value',
         field: 'scan-type',
         value: config['scan-type'],
-        message: '无效的扫描类型，支持 all 或 changed'
+        message: '无效的扫描类型，支持 all 或 changed',
       });
     }
 
@@ -108,7 +103,7 @@ export class ConfigValidator {
           type: 'invalid_value',
           field: 'source-path',
           value: config['source-path'],
-          message: 'Swagger 源路径必须是有效的 URL'
+          message: 'Swagger 源路径必须是有效的 URL',
         });
       }
     }
@@ -127,7 +122,7 @@ export class ConfigValidator {
    * 格式化验证错误信息
    */
   static formatErrors(errors: any[]): string[] {
-    return errors.map(error => {
+    return errors.map((error) => {
       let message = error.message;
       if (error.field) {
         message = `字段 ${error.field}: ${message}`;
@@ -141,14 +136,14 @@ export class ConfigValidator {
    */
   static generateDefaultConfig(): Config {
     return {
-      "apifox-project-id": "",
-      "apifox-api-key": "",
-      "source-type": "code",
-      "source-path": "./src",
-      "framework": "springboot",
-      "trigger-mode": "auto",
-      "sync-mode": "incremental",
-      "scan-type": "changed"
+      'apifox-project-id': '',
+      'apifox-api-key': '',
+      'source-type': 'code',
+      'source-path': './src',
+      framework: 'springboot',
+      'trigger-mode': 'auto',
+      'sync-mode': 'incremental',
+      'scan-type': 'changed',
     };
   }
 
@@ -158,7 +153,7 @@ export class ConfigValidator {
   static mergeConfigs(baseConfig: Config, overrideConfig: Partial<Config>): Config {
     return {
       ...baseConfig,
-      ...overrideConfig
+      ...overrideConfig,
     };
   }
 }

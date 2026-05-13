@@ -13,6 +13,7 @@ export interface ApiInfo {
   mapFields?: Record<string, any>;
   baseType?: string;
   summary?: string;
+  responseFields?: string[];
 }
 
 export interface ApiParameter {
