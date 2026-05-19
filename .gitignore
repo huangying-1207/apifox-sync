@@ -33,6 +33,12 @@ src/mcp/.mcp-credentials/
 # Test files (if not needed to be committed)
 # testdata/
 
+# IDE configuration
+.idea/
+*.iml
+*.ipr
+*.iws
+
 # TypeScript compilation output
 dist/
 *.js.map
