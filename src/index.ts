@@ -168,9 +168,65 @@ class ApifoxSync {
         const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
         this.formatter.setDtoSchemas(this.scanner.getDtoSchemas());
 
+        // 按变更源类分组输出受影响的接口
+        const changeImpact = this.scanner.getChangeSourceImpact();
+        if (changeImpact.size > 0) {
+          const lines: string[] = ['变更源及受影响接口:\n'];
+          changeImpact.forEach((methods, changeSource) => {
+            // 按 impactType 分组
+            const requestApis: string[] = [];
+            const responseApis: string[] = [];
+            for (const m of methods) {
+              const matchedApis = detectedApis.filter((api) => {
+                if (!api.controller || api.controller.replace('.java', '') !== m.controllerClass) return false;
+                if (api.javaMethodName) {
+                  return api.javaMethodName === m.methodName;
+                }
+                return true;
+              });
+              for (const api of matchedApis) {
+                const label = `${api.method.toUpperCase()} ${api.path}`;
+                if (m.impactType === 'request_body') {
+                  if (!requestApis.includes(label)) requestApis.push(label);
+                } else {
+                  if (!responseApis.includes(label)) responseApis.push(label);
+                }
+              }
+            }
+            const total = requestApis.length + responseApis.length;
+            console.log(`  ${changeSource} → ${total} 个接口`);
+            lines.push(`${changeSource} → ${total} 个接口`);
+            if (requestApis.length > 0) {
+              console.log(`    影响入参:`);
+              lines.push('  影响入参:');
+              for (const line of requestApis) {
+                console.log(`      ${line}`);
+                lines.push(`    ${line}`);
+              }
+            }
+            if (responseApis.length > 0) {
+              console.log(`    影响响应:`);
+              lines.push('  影响响应:');
+              for (const line of responseApis) {
+                console.log(`      ${line}`);
+                lines.push(`    ${line}`);
+              }
+            }
+            lines.push('');
+          });
+          // 写入文件
+          const reportDir = path.join(process.cwd(), 'temp');
+          if (!fs.existsSync(reportDir)) {
+            fs.mkdirSync(reportDir, { recursive: true });
+          }
+          const reportPath = path.join(reportDir, 'change-impact-report.txt');
+          fs.writeFileSync(reportPath, lines.join('\n'), 'utf8');
+          console.log(`\n变更影响详情已写入: ${reportPath}`);
+        }
+
         if (projectId && apiKey) {
           const existingApis = await this.syncer.getApifoxExistingApis(projectId, apiKey);
-          this.comparer.compareApiChanges(detectedApis, existingApis);
+          this.comparer.compareApiChanges(detectedApis, existingApis, scanType === 'changed');
 
           const docToCheck = this.formatter.generateApiDocFromCode(detectedApis);
           const unformattedCount = this.formatter.countUnformattedChinese(docToCheck);
@@ -297,13 +353,67 @@ class ApifoxSync {
 
           const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
           this.formatter.setDtoSchemas(this.scanner.getDtoSchemas());
+
+          const changeImpact = this.scanner.getChangeSourceImpact();
+          if (changeImpact.size > 0) {
+            const lines: string[] = ['变更源及受影响接口:\n'];
+            changeImpact.forEach((methods, changeSource) => {
+              const requestApis: string[] = [];
+              const responseApis: string[] = [];
+              for (const m of methods) {
+                const matchedApis = detectedApis.filter((api) => {
+                  if (!api.controller || api.controller.replace('.java', '') !== m.controllerClass) return false;
+                  if (api.javaMethodName) {
+                    return api.javaMethodName === m.methodName;
+                  }
+                  return true;
+                });
+                for (const api of matchedApis) {
+                  const label = `${api.method.toUpperCase()} ${api.path}`;
+                  if (m.impactType === 'request_body') {
+                    if (!requestApis.includes(label)) requestApis.push(label);
+                  } else {
+                    if (!responseApis.includes(label)) responseApis.push(label);
+                  }
+                }
+              }
+              const total = requestApis.length + responseApis.length;
+              console.log(`  ${changeSource} → ${total} 个接口`);
+              lines.push(`${changeSource} → ${total} 个接口`);
+              if (requestApis.length > 0) {
+                console.log(`    影响入参:`);
+                lines.push('  影响入参:');
+                for (const line of requestApis) {
+                  console.log(`      ${line}`);
+                  lines.push(`    ${line}`);
+                }
+              }
+              if (responseApis.length > 0) {
+                console.log(`    影响响应:`);
+                lines.push('  影响响应:');
+                for (const line of responseApis) {
+                  console.log(`      ${line}`);
+                  lines.push(`    ${line}`);
+                }
+              }
+              lines.push('');
+            });
+            const reportDir = path.join(process.cwd(), 'temp');
+            if (!fs.existsSync(reportDir)) {
+              fs.mkdirSync(reportDir, { recursive: true });
+            }
+            const reportPath = path.join(reportDir, 'change-impact-report.txt');
+            fs.writeFileSync(reportPath, lines.join('\n'), 'utf8');
+            console.log(`\n变更影响详情已写入: ${reportPath}`);
+          }
+
           openApiDoc = this.formatter.generateApiDocFromCode(detectedApis);
 
           if (syncMode === 'incremental' && !args['api-path']) {
             // 如果连接到 Apifox 项目，比较接口变化
             if (args['apifox-project-id'] && args['apifox-api-key']) {
               const existingApis = await this.syncer.getApifoxExistingApis(projectId, apiKey);
-              this.comparer.compareApiChanges(detectedApis, existingApis);
+              this.comparer.compareApiChanges(detectedApis, existingApis, syncMode === 'incremental');
 
               if (
                 this.comparer.scanResults.added.length > 0 ||
@@ -377,6 +487,13 @@ class ApifoxSync {
   async generateSingleApiDoc(sourcePath: string, framework: string, method: string, apiPath: string): Promise<any> {
     const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
     this.formatter.setDtoSchemas(this.scanner.getDtoSchemas());
+
+    const tracedFiles = this.scanner.getDependencyTracedFiles();
+    if (tracedFiles.length > 0) {
+      console.log(`其中 ${tracedFiles.length} 个 Controller 因 DTO/Service 依赖变更而被纳入扫描:`);
+      tracedFiles.forEach((file) => console.log(`  - ${path.basename(file)}`));
+    }
+
     const targetApi = detectedApis.find(
       (api) =>
         api.method.toLowerCase() === method.toLowerCase() &&
@@ -399,6 +516,12 @@ class ApifoxSync {
   async generateMultipleApisDoc(sourcePath: string, framework: string, apisParam: string): Promise<any> {
     const detectedApis = await this.scanner.scanCodeForChanges(sourcePath, framework);
     this.formatter.setDtoSchemas(this.scanner.getDtoSchemas());
+
+    const tracedFiles = this.scanner.getDependencyTracedFiles();
+    if (tracedFiles.length > 0) {
+      console.log(`其中 ${tracedFiles.length} 个 Controller 因 DTO/Service 依赖变更而被纳入扫描:`);
+      tracedFiles.forEach((file) => console.log(`  - ${path.basename(file)}`));
+    }
 
     const apiList = apisParam
       .split(',')
@@ -564,16 +687,19 @@ async function main(): Promise<void> {
       if (connectedProjects.length > 0) {
         // Prefer the project already configured in .apifoxsync.json
         const existingProjectName = configManager.getConfig('project-name') as string | undefined;
-        const projectName = (existingProjectName && connectedProjects.includes(existingProjectName))
-          ? existingProjectName
-          : connectedProjects[0];
+        const projectName =
+          existingProjectName && connectedProjects.includes(existingProjectName)
+            ? existingProjectName
+            : connectedProjects[0];
         const connectionInfo = apifoxMCP.getConnectionInfo(projectName);
         initArgs['project-name'] = projectName;
         initArgs['apifox-project-id'] = connectionInfo.projectId;
         initArgs['apifox-api-key'] = connectionInfo.apiKey;
         console.log(`已从凭据中加载项目 "${projectName}" 的连接信息`);
       } else {
-        console.warn('未检测到 MCP 连接信息，请先执行 `node dist/index.js mcp connect <项目名> <项目ID> <API密钥>` 连接 Apifox 项目');
+        console.warn(
+          '未检测到 MCP 连接信息，请先执行 `node dist/index.js mcp connect <项目名> <项目ID> <API密钥>` 连接 Apifox 项目',
+        );
         console.warn('配置文件将使用默认值生成，apifox-project-id 和 apifox-api-key 为空');
       }
 

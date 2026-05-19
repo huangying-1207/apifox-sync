@@ -24,7 +24,7 @@ class ApiFormatter {
   /**
    * Java 类型转 OpenAPI 类型
    */
-  javaTypeToOpenApi(javaType: string): any {
+  javaTypeToOpenApi(javaType: string, visited: Set<string> = new Set()): any {
     if (!javaType) return { type: 'string' };
 
     const t = javaType.trim();
@@ -49,11 +49,14 @@ class ApiFormatter {
     }
     const listMatch = t.match(/^(?:List|Set|Collection)<(.+)>$/);
     if (listMatch) {
-      const itemType = this.javaTypeToOpenApi(listMatch[1]);
+      const itemType = this.javaTypeToOpenApi(listMatch[1], visited);
       return { type: 'array', items: itemType.type === 'object' ? { type: 'object' } : itemType };
     }
     if (this.dtoSchemas[t]) {
-      return { type: 'object', properties: this.generateObjectProperties(t) };
+      if (visited.has(t)) {
+        return { type: 'object', description: `${t} (循环引用)` };
+      }
+      return { type: 'object', properties: this.generateObjectProperties(t, undefined, new Set([...visited, t])) };
     }
     return { type: 'object' };
   }
@@ -377,7 +380,7 @@ class ApiFormatter {
   /**
    * 生成对象类型的响应模式
    */
-  generateObjectProperties(objectType: string, api?: ApiInfo): any {
+  generateObjectProperties(objectType: string, api?: ApiInfo, visited: Set<string> = new Set()): any {
     const props: any = {};
 
     // 使用 baseType（JSON 转换前的原始类型）或 objectType 的 DTO Schema 作为基础字段
@@ -386,7 +389,7 @@ class ApiFormatter {
       const fields = this.dtoSchemas[baseObjectType];
       Object.keys(fields).forEach((fieldName) => {
         props[fieldName] = {
-          ...this.javaTypeToOpenApi(fields[fieldName]),
+          ...this.javaTypeToOpenApi(fields[fieldName], visited),
           description: getDefaultPropDescription(fieldName),
         };
       });

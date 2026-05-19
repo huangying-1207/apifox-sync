@@ -18,8 +18,9 @@ class ApiComparer {
 
   /**
    * 比较接口变化
+   * @param incremental 是否增量模式，增量模式下只对检测到的 Controller 范围内做删除判定
    */
-  compareApiChanges(detectedApis: ApiInfo[], existingApis: ApiInfo[]): any {
+  compareApiChanges(detectedApis: ApiInfo[], existingApis: ApiInfo[], incremental: boolean = false): any {
     console.log('正在比较接口变化...');
 
     const detectedMap = new Map<string, ApiInfo>();
@@ -43,9 +44,14 @@ class ApiComparer {
     });
 
     // 查找已删除接口
+    // 增量模式下，只对本次扫描覆盖的 Controller 范围内判定删除，避免未扫描的接口被误判
+    const scannedControllers = new Set(detectedApis.map((api) => api.controller).filter(Boolean) as string[]);
     existingApis.forEach((api) => {
       const normalizedPath = normalizePath(api.path);
       if (!detectedMap.has(`${api.method.toLowerCase()}:${normalizedPath}`)) {
+        if (incremental && !scannedControllers.has(api.controller || '')) {
+          return; // 增量模式下跳过未扫描的 Controller
+        }
         this.scanResults.removed.push(api);
       }
     });
@@ -122,9 +128,18 @@ class ApiComparer {
       // OpenAPI 导出的类型可能是通用的 object/array，Java 扫描器提取的是具体类型
       // object 是最通用的 OpenAPI 类型，可代表任何 Java 类型，不算实际变更
       const javaToOpenApiTypeMap: Record<string, string> = {
-        String: 'string', Integer: 'integer', Long: 'integer', Double: 'number',
-        Float: 'number', Boolean: 'boolean', Object: 'object', int: 'integer',
-        long: 'integer', double: 'number', float: 'number', boolean: 'boolean',
+        String: 'string',
+        Integer: 'integer',
+        Long: 'integer',
+        Double: 'number',
+        Float: 'number',
+        Boolean: 'boolean',
+        Object: 'object',
+        int: 'integer',
+        long: 'integer',
+        double: 'number',
+        float: 'number',
+        boolean: 'boolean',
       };
       const detectedNormalized = javaToOpenApiTypeMap[detectedApi.returnType] || detectedApi.returnType.toLowerCase();
       const existingNormalized = existingApi.returnType.toLowerCase();
@@ -155,52 +170,83 @@ class ApiComparer {
   }
 
   /**
-   * 输出接口变化详细信息
+   * 输出接口变化详细信息（按类分组）
    */
   outputChangeDetails(detectedApis: ApiInfo[], existingApis: ApiInfo[]): void {
     console.log('\n=== 接口变化详细信息 ===');
 
     // 创建快速查找的映射
-    const detectedMap = new Map<string, ApiInfo>();
-    detectedApis.forEach((api) => {
-      const normalizedPath = normalizePath(api.path);
-      detectedMap.set(`${api.method}:${normalizedPath}`, api);
-    });
-
     const existingMap = new Map<string, ApiInfo>();
     existingApis.forEach((api) => {
       const normalizedPath = normalizePath(api.path);
       existingMap.set(`${api.method.toLowerCase()}:${normalizedPath}`, api);
     });
 
-    if (this.scanResults.added.length > 0) {
-      console.log('\n新增接口:');
-      this.scanResults.added.forEach((api) => {
-        console.log(`  ✚ ${api.method.toUpperCase()} ${api.path} (${api.controller})`);
-      });
+    // 按类（controller）分组所有变更
+    interface GroupedChange {
+      added: ApiInfo[];
+      updated: ApiInfo[];
+      removed: ApiInfo[];
+    }
+    const byController = new Map<string, GroupedChange>();
+
+    const getGroup = (controller: string): GroupedChange => {
+      if (!byController.has(controller)) {
+        byController.set(controller, { added: [], updated: [], removed: [] });
+      }
+      return byController.get(controller)!;
+    };
+
+    this.scanResults.added.forEach((api) => {
+      getGroup(api.controller || '未知类').added.push(api);
+    });
+    this.scanResults.updated.forEach((api) => {
+      getGroup(api.controller || '未知类').updated.push(api);
+    });
+    this.scanResults.removed.forEach((api) => {
+      getGroup(api.controller || '未知类').removed.push(api);
+    });
+
+    if (byController.size === 0) {
+      console.log('');
+      return;
     }
 
-    if (this.scanResults.updated.length > 0) {
-      console.log('\n更新接口:');
-      this.scanResults.updated.forEach((api) => {
-        const normalizedPath = normalizePath(api.path);
-        const existingApi = existingMap.get(`${api.method}:${normalizedPath}`);
+    // 先输出汇总统计
+    const totalAdded = this.scanResults.added.length;
+    const totalUpdated = this.scanResults.updated.length;
+    const totalRemoved = this.scanResults.removed.length;
+    console.log(`共 ${byController.size} 个类受到影响：新增 ${totalAdded}, 更新 ${totalUpdated}, 删除 ${totalRemoved}`);
 
-        console.log(`  ⭐ ${api.method.toUpperCase()} ${api.path} (${api.controller})`);
+    // 按类逐一输出
+    byController.forEach((changes, controller) => {
+      const count = changes.added.length + changes.updated.length + changes.removed.length;
+      console.log(`\n📁 ${controller} (${count} 个变更)`);
 
-        // 比较并输出接口内容的变更
-        if (existingApi) {
-          this.outputApiChangeDetails(api, existingApi);
-        }
-      });
-    }
+      if (changes.added.length > 0) {
+        changes.added.forEach((api) => {
+          console.log(`  ✚ ${api.method.toUpperCase()} ${api.path}`);
+        });
+      }
 
-    if (this.scanResults.removed.length > 0) {
-      console.log('\n删除接口:');
-      this.scanResults.removed.forEach((api) => {
-        console.log(`  ✖ ${api.method.toUpperCase()} ${api.path}`);
-      });
-    }
+      if (changes.updated.length > 0) {
+        changes.updated.forEach((api) => {
+          const normalizedPath = normalizePath(api.path);
+          const existingApi = existingMap.get(`${api.method}:${normalizedPath}`);
+
+          console.log(`  ⭐ ${api.method.toUpperCase()} ${api.path}`);
+          if (existingApi) {
+            this.outputApiChangeDetails(api, existingApi);
+          }
+        });
+      }
+
+      if (changes.removed.length > 0) {
+        changes.removed.forEach((api) => {
+          console.log(`  ✖ ${api.method.toUpperCase()} ${api.path}`);
+        });
+      }
+    });
 
     console.log('');
   }

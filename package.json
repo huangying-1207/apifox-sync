@@ -10,10 +10,10 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "test": "mocha test/**/*.test.js --reporter spec",
-    "test:dev": "mocha dist/test/**/*.test.js --reporter spec --watch-extensions ts,js --watch",
-    "test:helper": "mocha dist/test/helper.test.js --reporter spec",
-    "test:error": "mocha dist/test/errorHandler.test.js --reporter spec",
-    "test:scanner": "mocha dist/test/scanner.test.js --reporter spec",
+    "test:dev": "mocha test/**/*.test.js --reporter spec --watch-extensions ts,js --watch",
+    "test:helper": "mocha test/helper.test.js --reporter spec",
+    "test:error": "mocha test/errorHandler.test.js --reporter spec",
+    "test:scanner": "mocha test/scanner.test.js --reporter spec",
     "mcp": "node dist/mcp/mcp-server.js",
     "mcp:start": "node dist/mcp/mcp-server.js",
     "start": "node dist/index.js",
@@ -59,6 +59,7 @@
     "prettier": "^3.8.3",
     "sinon": "^22.0.0",
     "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^6.0.3"
   }
 }

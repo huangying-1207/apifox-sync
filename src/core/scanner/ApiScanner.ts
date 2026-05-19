@@ -6,18 +6,19 @@
 import fs from 'fs';
 import path from 'path';
 import { sync as globSync } from 'glob';
-import { ApiInfo, FrameworkConfig } from '../../types';
+import { ApiInfo, FrameworkConfig, ChangePoint } from '../../types';
 import { ErrorHandler } from '../../utils/errorHandler';
+import { DependencyGraph } from './DependencyGraph';
 
 const FRAMEWORK_CONFIGS: Record<string, FrameworkConfig> = {
   springboot: {
     name: 'Spring Boot',
     filePattern: '**/*Controller.java',
     methodPatterns: {
-      get: /@GetMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
-      post: /@PostMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
-      put: /@PutMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
-      delete: /@DeleteMapping\s*\(\s*["']?([^"']*)["']?\s*\)/g,
+      get: /@GetMapping\s*\(\s*(\{[^}]*\}|[^)]*)\)/g,
+      post: /@PostMapping\s*\(\s*(\{[^}]*\}|[^)]*)\)/g,
+      put: /@PutMapping\s*\(\s*(\{[^}]*\}|[^)]*)\)/g,
+      delete: /@DeleteMapping\s*\(\s*(\{[^}]*\}|[^)]*)\)/g,
     },
     classPathPattern: /@RequestMapping\s*\(\s*["']?([^"']*)["']?\s*\)/,
     fileExts: ['.java'],
@@ -52,6 +53,23 @@ const FRAMEWORK_CONFIGS: Record<string, FrameworkConfig> = {
 export class ApiScanner {
   private changedFiles: string[] = [];
   private dtoSchemas: any = {};
+  private dependencyTracedFiles: string[] = [];
+  private tracedClassNames: string[] = [];
+  private dependencyGraph: DependencyGraph | null = null;
+  private affectedControllerMethods: Map<string, Set<string>> = new Map();
+  private affectedMethodSources: Map<
+    string,
+    Map<
+      string,
+      Array<{
+        changeSource: string;
+        changeType: 'field' | 'method' | 'put_fields';
+        changeDetail?: string;
+        tracePath: string[];
+        impactType: 'request_body' | 'response';
+      }>
+    >
+  > = new Map();
 
   /**
    * 查找 git 仓库根目录
@@ -120,9 +138,182 @@ export class ApiScanner {
   }
 
   /**
+   * 追踪变更的非 Controller Java 文件（DTO/Service 等）到引用它们的 Controller
+   * 优先使用依赖图（继承树 + 调用链）反向追踪，失败时回退到文本匹配
+   */
+  traceDtoDependencies(sourcePath: string): void {
+    if (this.changedFiles.length === 0) return;
+
+    const changedNonControllerFiles = this.changedFiles.filter(
+      (file) => file.endsWith('.java') && !file.match(/Controller\.java$/),
+    );
+
+    if (changedNonControllerFiles.length === 0) return;
+
+    console.log(`检测到 ${changedNonControllerFiles.length} 个非 Controller 的 Java 文件变更，正在追踪依赖...`);
+
+    try {
+      this.dependencyGraph = new DependencyGraph();
+      const buildSuccess = this.dependencyGraph.build(sourcePath);
+
+      if (!buildSuccess) {
+        throw new Error('依赖图构建失败');
+      }
+
+      const projectRoot = this.findGitRoot(sourcePath);
+
+      // 字段级变更检测
+      const fieldChanges = this.dependencyGraph.detectFieldLevelChanges(projectRoot, this.changedFiles);
+
+      // 构建变更点（只有字段级变更走 schema 追踪）
+      const changePoints: ChangePoint[] = [];
+
+      for (const fc of fieldChanges) {
+        const details: string[] = [];
+        if (fc.addedFields.length > 0) details.push(`新增字段: ${fc.addedFields.join(', ')}`);
+        if (fc.removedFields.length > 0) details.push(`删除字段: ${fc.removedFields.join(', ')}`);
+        if (fc.changedFields.length > 0) details.push(`类型变更: ${fc.changedFields.join(', ')}`);
+        const detail = details.join('; ');
+        changePoints.push({ className: fc.className, changeType: 'field', changeDetail: detail });
+      }
+
+      if (changePoints.length === 0) {
+        console.log('未检测到 DTO 字段级变更，跳过 schema 影响追踪');
+        return;
+      }
+
+      // 基于 schema 引用追踪受影响的 Controller 方法
+      const affectedMethods = this.dependencyGraph.findSchemaAffectedControllers(changePoints, fieldChanges);
+
+      if (affectedMethods.length > 0) {
+        const tracedControllers = [...new Set(affectedMethods.map((m) => m.controllerFile))];
+        this.dependencyTracedFiles = tracedControllers;
+
+        // 按文件存储受影响的方法名及变更来源
+        this.affectedControllerMethods = new Map();
+        this.affectedMethodSources = new Map();
+        for (const m of affectedMethods) {
+          if (!this.affectedControllerMethods.has(m.controllerFile)) {
+            this.affectedControllerMethods.set(m.controllerFile, new Set());
+            this.affectedMethodSources.set(m.controllerFile, new Map());
+          }
+          this.affectedControllerMethods.get(m.controllerFile)!.add(m.methodName);
+          const sources = this.affectedMethodSources.get(m.controllerFile)!;
+          if (!sources.has(m.methodName)) {
+            sources.set(m.methodName, []);
+          }
+          sources.get(m.methodName)!.push({
+            changeSource: m.changeSource,
+            changeType: m.changeType,
+            changeDetail: m.changeDetail,
+            tracePath: m.tracePath,
+            impactType: m.impactType as 'request_body' | 'response',
+          });
+        }
+
+        // 将受影响的 Controller 加入变更文件列表
+        const newControllers = tracedControllers.filter((f) => !this.changedFiles.includes(f));
+        this.changedFiles = [...this.changedFiles, ...newControllers];
+
+        // 按变更源 + 影响类型分组输出摘要
+        const byChangeSourceAndImpact = new Map<string, Map<string, number>>();
+        for (const m of affectedMethods) {
+          if (!byChangeSourceAndImpact.has(m.changeSource)) {
+            byChangeSourceAndImpact.set(m.changeSource, new Map());
+          }
+          const imap = byChangeSourceAndImpact.get(m.changeSource)!;
+          imap.set(m.impactType, (imap.get(m.impactType) || 0) + 1);
+        }
+        console.log(`基于 schema 引用的追踪完成: 发现 ${tracedControllers.length} 个受影响的 Controller`);
+        for (const [source, imap] of byChangeSourceAndImpact) {
+          const parts: string[] = [];
+          if (imap.get('request_body')) parts.push(`${imap.get('request_body')} 个入参受影响`);
+          if (imap.get('response')) parts.push(`${imap.get('response')} 个响应受影响`);
+          console.log(`  ${source} → ${parts.join(', ')}`);
+        }
+      } else {
+        console.log('基于 schema 引用的追踪完成: 未发现受影响的 Controller');
+      }
+    } catch (error: any) {
+      console.warn('依赖图追踪失败，回退到文本匹配:', error.message || error);
+      this.traceDtoDependenciesFallback(sourcePath, changedNonControllerFiles);
+    }
+  }
+
+  /**
+   * 旧版文本匹配依赖追踪（作为兜底方案）
+   */
+  private traceDtoDependenciesFallback(sourcePath: string, changedNonControllerFiles: string[]): void {
+    const classNames: string[] = [];
+    for (const file of changedNonControllerFiles) {
+      const className = path.basename(file, '.java');
+      classNames.push(className);
+      if (className.endsWith('Impl')) {
+        classNames.push(className.slice(0, -4));
+      }
+    }
+    this.tracedClassNames = classNames;
+
+    const normalizedSourcePath = sourcePath.replace(/\\/g, '/');
+    const allControllerFiles = globSync(normalizedSourcePath + '/**/*Controller.java');
+
+    const tracedControllers: string[] = [];
+    for (const controllerFile of allControllerFiles) {
+      if (this.changedFiles.includes(controllerFile)) continue;
+
+      try {
+        const content = fs.readFileSync(controllerFile, 'utf8');
+
+        for (const className of classNames) {
+          if (new RegExp(`\\b${className}\\b`).test(content)) {
+            tracedControllers.push(controllerFile);
+            console.log(`  依赖追踪(文本匹配): ${path.basename(controllerFile)} 引用了 ${className}`);
+            break;
+          }
+        }
+      } catch (_error: any) {
+        console.warn(`  警告：无法读取文件 ${controllerFile}`);
+      }
+    }
+
+    if (tracedControllers.length > 0) {
+      this.dependencyTracedFiles = tracedControllers;
+      this.changedFiles = [...this.changedFiles, ...tracedControllers];
+      console.log(`依赖追踪完成(文本匹配): 额外发现 ${tracedControllers.length} 个受影响的 Controller 文件`);
+    } else {
+      console.log('依赖追踪完成(文本匹配): 未发现受影响的 Controller 文件');
+    }
+  }
+
+  /**
    * 扫描 Java 类文件，提取字段定义
+   * 优先从依赖图复用（含继承字段），否则回退到独立扫描
    */
   scanJavaClasses(sourcePath: string): any {
+    // 依赖图已构建时，复用其 classIndex（含继承感知的字段）
+    if (this.dependencyGraph) {
+      const classIndex = this.dependencyGraph.getClassIndex();
+      const classSchemas: any = {};
+      for (const [className, classInfo] of classIndex) {
+        if (classInfo.isController || classInfo.isService) continue;
+        const allFields: Record<string, string> = {};
+        // 收集继承链上的字段
+        const ancestors = this.dependencyGraph.getAncestors(className);
+        for (const ancestor of ancestors) {
+          const ancestorInfo = classIndex.get(ancestor);
+          if (ancestorInfo) {
+            Object.assign(allFields, ancestorInfo.fields);
+          }
+        }
+        Object.assign(allFields, classInfo.fields);
+        if (Object.keys(allFields).length > 0) {
+          classSchemas[className] = allFields;
+        }
+      }
+      this.dtoSchemas = classSchemas;
+      return classSchemas;
+    }
+
     const classSchemas: any = {};
 
     try {
@@ -313,6 +504,7 @@ export class ApiScanner {
   async scanSpringBootCode(sourcePath: string): Promise<ApiInfo[]> {
     const controllers: ApiInfo[] = [];
 
+    this.traceDtoDependencies(sourcePath);
     this.scanJavaClasses(sourcePath);
 
     const apiPatterns = {
@@ -353,14 +545,17 @@ export class ApiScanner {
         }
       }
 
-      const content = fs.readFileSync(normalizedFile, 'utf8');
+      const rawContent = fs.readFileSync(normalizedFile, 'utf8');
       const fileName = path.basename(normalizedFile);
 
+      // 去除注释，避免匹配到被注释掉的注解
+      const content = rawContent.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+
       let classPathPrefix = '';
-      const classRequestMappingPattern = /@RequestMapping\s*\(\s*["']?([^"']*)["']?\s*\)/;
+      const classRequestMappingPattern = /@RequestMapping\s*\(\s*(\{[^}]*\}|[^)]+)\)/;
       const classPathMatch = content.match(classRequestMappingPattern);
       if (classPathMatch) {
-        classPathPrefix = classPathMatch[1];
+        classPathPrefix = this.extractPathFromAnnotation(classPathMatch[1]);
         if (classPathPrefix && !classPathPrefix.startsWith('/')) {
           classPathPrefix = '/' + classPathPrefix;
         }
@@ -372,7 +567,7 @@ export class ApiScanner {
       Object.keys(apiPatterns).forEach((method: string) => {
         const matches = [...content.matchAll((apiPatterns as any)[method])];
         matches.forEach((match) => {
-          let apiPath = match[1];
+          let apiPath = this.extractPathFromAnnotation(match[1]);
           if (apiPath && !apiPath.startsWith('/')) {
             apiPath = '/' + apiPath;
           }
@@ -394,6 +589,12 @@ export class ApiScanner {
           const methodStart = match.index!;
           const methodEnd = this.findMethodEnd(content, methodStart);
           const methodContent = content.slice(methodStart, methodEnd);
+
+          // 提取 Java 方法名
+          const javaMethodNameMatch = methodContent.match(/\b(?:public|private|protected)\s+\S+\s+(\w+)\s*\(/);
+          if (javaMethodNameMatch) {
+            api.javaMethodName = javaMethodNameMatch[1];
+          }
 
           // 匹配路径参数 (@PathVariable)
           const pathParamPattern = /@PathVariable(?:\([^)]*\))?\s*\w+\s*(\w+)/g;
@@ -457,6 +658,38 @@ export class ApiScanner {
     }
 
     return controllers;
+  }
+
+  /**
+   * 从 @RequestMapping/@GetMapping 等注解的值中提取路径
+   * 支持以下形式:
+   *   @RequestMapping("/api/foo")
+   *   @RequestMapping({"/api/foo", "/inner/foo"})  — 数组取第一个
+   *   @PostMapping(value = "/foo")
+   *   @PostMapping(value = {"/foo", "/bar"})  — 数组取第一个
+   *   @PostMapping(value = "/foo", produces = "...")
+   */
+  private extractPathFromAnnotation(raw: string): string {
+    raw = raw.trim();
+
+    // 处理 value = ... 或 path = ... 形式
+    const namedMatch = raw.match(/(?:value|path)\s*=\s*(\{[^}]*\}|["'][^"']*["'])/);
+    if (namedMatch) {
+      raw = namedMatch[1].trim();
+    }
+
+    // 数组形式: {"/a", "/b"}
+    const arrayMatch = raw.match(/^\{(.+)\}$/s);
+    if (arrayMatch) {
+      const inner = arrayMatch[1];
+      const firstPath = inner.match(/["']([^"']+)["']/);
+      return firstPath ? firstPath[1] : '';
+    }
+    // 单路径: 去掉引号
+    const singleMatch = raw.match(/^["']([^"']+)["']$/);
+    if (singleMatch) return singleMatch[1];
+    // 无引号
+    return raw;
   }
 
   /**
@@ -655,8 +888,9 @@ export class ApiScanner {
 
     console.log(`正在扫描 ${config.name} 项目接口变化: ${sourcePath}`);
 
-    // 扫描 Java 类文件以获取 DTO 模式
+    // 先构建依赖图，再复用其 classIndex 构建 DTO Schema
     if (framework === 'springboot') {
+      this.traceDtoDependencies(sourcePath);
       this.scanJavaClasses(sourcePath);
     }
 
@@ -686,14 +920,21 @@ export class ApiScanner {
         continue;
       }
 
-      const content = fs.readFileSync(file, 'utf8');
+      const rawContent = fs.readFileSync(file, 'utf8');
       const fileName = path.basename(file);
+
+      // 去除注释，避免匹配到被注释掉的注解（如 // @GetMapping 或 /* @GetMapping */）
+      const content = rawContent
+        .replace(/\/\*[\s\S]*?\*\//g, '') // 多行注释
+        .replace(/^[ \t]*\/\/.*$/gm, ''); // 单行注释
 
       let classPathPrefix = '';
       if (config.classPathPattern) {
-        const classPathMatch = content.match(config.classPathPattern);
+        // 使用支持数组路径的正则
+        const arrayAwarePattern = /@RequestMapping\s*\(\s*(\{[^}]*\}|[^)]+)\)/;
+        const classPathMatch = content.match(arrayAwarePattern);
         if (classPathMatch) {
-          classPathPrefix = classPathMatch[1];
+          classPathPrefix = this.extractPathFromAnnotation(classPathMatch[1]);
           if (classPathPrefix && !classPathPrefix.startsWith('/')) {
             classPathPrefix = '/' + classPathPrefix;
           }
@@ -706,7 +947,7 @@ export class ApiScanner {
       Object.keys(config.methodPatterns).forEach((method) => {
         const matches = [...content.matchAll(config.methodPatterns[method])];
         matches.forEach((match) => {
-          let apiPath = match[1];
+          let apiPath = this.extractPathFromAnnotation(match[1]);
 
           // 规范化路径
           if (apiPath && !apiPath.startsWith('/')) {
@@ -735,12 +976,46 @@ export class ApiScanner {
             this.parseDjangoApiDetails(content, api, match.index!);
           }
 
-          apis.push(api);
+          // 方法级依赖过滤：对依赖追踪纳入的 Controller，只保留受影响的接口
+          let skipByDependencyFilter = false;
+          if (this.dependencyTracedFiles.includes(file)) {
+            if (this.affectedControllerMethods.size > 0) {
+              // 基于依赖图的精确过滤：检查当前方法名是否在受影响集合中
+              const affectedMethods = this.affectedControllerMethods.get(file);
+              if (affectedMethods) {
+                const methodContent = this.extractMethodContent(content, match.index!);
+                const methodNameMatch = methodContent.match(/public\s+\S+\s+(\w+)\s*\(/);
+                const currentMethodName = methodNameMatch ? methodNameMatch[1] : null;
+                api.javaMethodName = currentMethodName || undefined;
+                skipByDependencyFilter = !currentMethodName || !affectedMethods.has(currentMethodName);
+              } else {
+                skipByDependencyFilter = true;
+              }
+            } else if (this.tracedClassNames.length > 0) {
+              // 兜底文本匹配过滤
+              const methodContent = this.extractMethodContent(content, match.index!);
+              const isAffected = this.tracedClassNames.some((className) =>
+                new RegExp(`\\b${className}\\b`).test(methodContent),
+              );
+              skipByDependencyFilter = !isAffected;
+            }
+          }
+
+          if (!skipByDependencyFilter) {
+            apis.push(api);
+          }
         });
       });
     }
 
     console.log(`✅ 扫描完成，发现 ${apis.length} 个接口`);
+    if (this.dependencyTracedFiles.length > 0) {
+      if (this.affectedControllerMethods.size > 0) {
+        console.log(`（其中依赖追踪的 Controller 已按依赖图方法级过滤）`);
+      } else if (this.tracedClassNames.length > 0) {
+        console.log(`（其中依赖追踪的 Controller 已按文本匹配方法级过滤）`);
+      }
+    }
     return apis;
   }
 
@@ -875,6 +1150,57 @@ export class ApiScanner {
    */
   getChangedFiles(): string[] {
     return this.changedFiles;
+  }
+
+  /**
+   * 获取依赖追踪发现的受影响文件列表
+   */
+  getDependencyTracedFiles(): string[] {
+    return this.dependencyTracedFiles;
+  }
+
+  /**
+   * 获取变更源到受影响 Controller 方法的映射
+   * 结构: Map<变更源类名, Array<{ controllerFile, controllerClass, methodName, impactType }>>
+   */
+  getChangeSourceImpact(): Map<
+    string,
+    Array<{
+      controllerFile: string;
+      controllerClass: string;
+      methodName: string;
+      impactType: 'request_body' | 'response';
+    }>
+  > {
+    const result = new Map<
+      string,
+      Array<{
+        controllerFile: string;
+        controllerClass: string;
+        methodName: string;
+        impactType: 'request_body' | 'response';
+      }>
+    >();
+    this.affectedMethodSources.forEach((methodMap, controllerFile) => {
+      const controllerClass = path.basename(controllerFile).replace('.java', '');
+      methodMap.forEach((sources, methodName) => {
+        for (const src of sources) {
+          if (!result.has(src.changeSource)) {
+            result.set(src.changeSource, []);
+          }
+          const existing = result.get(src.changeSource)!;
+          if (
+            !existing.some(
+              (e) =>
+                e.controllerClass === controllerClass && e.methodName === methodName && e.impactType === src.impactType,
+            )
+          ) {
+            existing.push({ controllerFile, controllerClass, methodName, impactType: src.impactType });
+          }
+        }
+      });
+    });
+    return result;
   }
 }
 

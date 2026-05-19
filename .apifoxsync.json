@@ -1,10 +1,11 @@
 {
-  "apifox-project-id": "",
-  "apifox-api-key": "",
+  "apifox-project-id": "5145150",
+  "apifox-api-key": "afxp_e446dbszDoM37rP9MJkRgUCztj4F4bFaTEs4",
   "source-type": "code",
-  "source-path": "./src",
+  "source-path": "D:/IDEA/mams-nexus-2/src",
   "framework": "springboot",
   "trigger-mode": "auto",
   "sync-mode": "incremental",
-  "scan-type": "changed"
+  "scan-type": "changed",
+  "project-name": "nexus"
 }

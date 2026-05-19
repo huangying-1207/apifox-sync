@@ -157,9 +157,7 @@ class ApifoxSyncer {
               for (const contentType of contentTypes) {
                 const schema = methodDetails.requestBody.content[contentType].schema;
                 if (schema) {
-                  api.requestBodyType = schema.$ref
-                    ? schema.$ref.split('/').pop()
-                    : schema.type;
+                  api.requestBodyType = schema.$ref ? schema.$ref.split('/').pop() : schema.type;
                   break;
                 }
               }
