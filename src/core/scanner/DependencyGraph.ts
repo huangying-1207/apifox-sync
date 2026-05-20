@@ -763,8 +763,18 @@ export class DependencyGraph {
         if (!current.methodName) continue;
         const method = classInfo.methods.find((m) => m.name === current.methodName);
         if (method) {
-          // 返回类型为黑盒且无 .data(...) 调用 → 不返回业务数据，跳过
-          if (this.isOpaqueType(method.returnType) && method.dataCalls.length === 0) continue;
+          // 返回类型为黑盒且无 .data(...) 调用，但检查方法体是否直接使用了受影响 DTO
+          if (this.isOpaqueType(method.returnType) && method.dataCalls.length === 0) {
+            // 检查方法体是否直接使用了受影响 DTO（通过字段访问、方法调用等）
+            const usesAffectedDto =
+              method.constructorCalls.some((ct) => this.isTypeAffected(ct, affectedDtos)) ||
+              Object.keys(method.typedFieldAccesses).some((className) => affectedDtos.has(className)) ||
+              method.typeConversionCalls.some((tc) => this.isTypeAffected(tc.sourceType, affectedDtos));
+
+            if (!usesAffectedDto) {
+              continue;
+            }
+          }
         }
         const changeDetail = fieldChangePoints.find((cp) => cp.className === current.changeSource)?.changeDetail;
         results.push({
@@ -864,6 +874,38 @@ export class DependencyGraph {
   }
 
   /**
+   * 找到方法使用的第一个受影响的 DTO 作为变更源
+   */
+  private findFirstAffectedDto(
+    method: MethodInfo,
+    affectedDtos: Set<string>,
+    changedDtos: Set<string>,
+    fieldChangePoints: ChangePoint[],
+  ): string | undefined {
+    // 检查构造调用
+    const constructorImpacted = method.constructorCalls.find((ct) => this.isTypeAffected(ct, affectedDtos));
+    if (constructorImpacted) {
+      return this.findChangeSourceForType(constructorImpacted, changedDtos, fieldChangePoints);
+    }
+
+    // 检查字段访问
+    const fieldImpacted = Object.keys(method.typedFieldAccesses).find((className) => affectedDtos.has(className));
+    if (fieldImpacted) {
+      return this.findChangeSourceForType(fieldImpacted, changedDtos, fieldChangePoints);
+    }
+
+    // 检查类型转换调用
+    const typeConversionImpacted = method.typeConversionCalls.find((tc) =>
+      this.isTypeAffected(tc.sourceType, affectedDtos),
+    );
+    if (typeConversionImpacted) {
+      return this.findChangeSourceForType(typeConversionImpacted.sourceType, changedDtos, fieldChangePoints);
+    }
+
+    return undefined;
+  }
+
+  /**
    * 判断类型是否为"黑盒"类型（签名上看不出内部 DTO 结构）
    */
   private isOpaqueType(type: string | undefined): boolean {
@@ -885,7 +927,7 @@ export class DependencyGraph {
 
   /**
    * 当 Controller 方法签名类型为"黑盒"时，沿方法体调用链查找间接引用的受影响 DTO
-   * 响应方向：签名类型为黑盒时，需有 .data(...) 调用才追踪；沿 service 调用查找返回类型
+   * 响应方向：签名类型为黑盒时，需有 .data(...) 调用或直接使用受影响 DTO 才追踪
    * 入参方向：签名类型为黑盒时，沿 service 调用查找参数类型
    */
   private findIndirectDtoReferences(
@@ -898,27 +940,93 @@ export class DependencyGraph {
     depth: number = 0,
     maxDepth: number = 10,
   ): AffectedControllerMethod[] {
+    // 调试信息：打印正在处理的方法
+    console.log(`=== 正在处理方法: ${controllerClass.name}.${method.name} ===`);
+    console.log(`  方法体是否直接使用受影响 DTO:
+    - 构造调用: ${method.constructorCalls}
+    - 字段访问: ${Object.keys(method.typedFieldAccesses)}
+    - 类型转换: ${method.typeConversionCalls.map((tc) => tc.sourceType)}`);
+
     const results: AffectedControllerMethod[] = [];
     const returnOpaque = this.isOpaqueType(method.returnType);
     const requestOpaque = this.isOpaqueType(method.requestBodyType);
 
-    // 响应方向：签名类型为黑盒，但方法体没有 .data(...) → 不返回业务数据，跳过
-    if (returnOpaque && method.dataCalls.length === 0) {
-      // 不追踪响应
-    } else if (returnOpaque) {
-      // 有 .data(...)，沿调用链查找返回类型引用了受影响 DTO 的 service 方法
-      const responseRefs = this.traceCallsForDto(
-        controllerClass,
-        method,
-        affectedDtos,
-        changedDtos,
-        fieldChangePoints,
-        'response',
-        depth,
-        maxDepth,
-        fieldChanges,
-      );
-      results.push(...responseRefs);
+    // 响应方向：签名类型为黑盒时，检查是否直接使用了受影响 DTO，无论是否有 .data(...) 调用
+    if (returnOpaque) {
+      const usesAffectedDto =
+        method.constructorCalls.some((ct) => this.isTypeAffected(ct, affectedDtos)) ||
+        Object.keys(method.typedFieldAccesses).some((className) => affectedDtos.has(className)) ||
+        method.typeConversionCalls.some((tc) => this.isTypeAffected(tc.sourceType, affectedDtos));
+
+      if (usesAffectedDto) {
+        // 直接使用了受影响 DTO，添加到结果中
+        const changeSource = this.findFirstAffectedDto(method, affectedDtos, changedDtos, fieldChangePoints);
+        if (changeSource) {
+          // 字段级过滤：只有当方法实际访问了变更字段时才标记受影响
+          let shouldInclude = true;
+          if (fieldChanges) {
+            const fc = fieldChanges.find((f) => f.className === changeSource);
+            if (fc) {
+              const changedFields = new Set([...fc.addedFields, ...fc.removedFields, ...fc.changedFields]);
+              const accessedFields = method.typedFieldAccesses[changeSource] || [];
+
+              // 对于使用了 BeanUtils.copyProperties 的方法，认为它访问了所有字段
+              // 对于直接返回受影响 DTO 的方法（没有访问字段），也应包含在受影响接口列表中
+              const usesBeanUtilsCopy = method.calls.some((call) => call.includes('BeanUtils.copyProperties'));
+              const isDirectlyReturningDto =
+                method.constructorCalls.includes(changeSource) ||
+                method.returnType.includes(changeSource) ||
+                method.typeConversionCalls.some((tc) => tc.targetTypeName.includes(changeSource));
+              const hasFieldOverlap =
+                usesBeanUtilsCopy || accessedFields.some((f) => changedFields.has(f)) || isDirectlyReturningDto;
+
+              // 调试信息
+              console.log(`=== 字段级过滤详情 ===`);
+              console.log(`  方法名: ${controllerClass.name}.${method.name}`);
+              console.log(`  变更源: ${changeSource}`);
+              console.log(`  变更字段: ${Array.from(changedFields)}`);
+              console.log(`  方法访问的字段: ${accessedFields}`);
+              console.log(`  是否使用 BeanUtils.copyProperties: ${usesBeanUtilsCopy}`);
+              console.log(`  是否有重叠: ${hasFieldOverlap}`);
+
+              shouldInclude = hasFieldOverlap;
+            }
+          }
+
+          if (shouldInclude) {
+            const changeDetail = fieldChangePoints.find((cp) => cp.className === changeSource)?.changeDetail;
+            results.push({
+              controllerFile: controllerClass.file,
+              controllerClass: controllerClass.name,
+              methodName: method.name,
+              tracePath: [`${changeSource} 字段变更`, `→ ${controllerClass.name}.${method.name}() 直接使用受影响 DTO`],
+              changeSource: changeSource,
+              changeType: 'field',
+              changeDetail,
+              impactType: 'response',
+            });
+            console.log(`✅ 已添加受影响方法: ${controllerClass.name}.${method.name}`);
+          } else {
+            console.log(`❌ 方法 ${controllerClass.name}.${method.name} 使用了受影响 DTO，但未访问变更字段，已过滤`);
+          }
+        }
+      } else {
+        // 没有直接使用受影响 DTO，沿调用链查找返回类型引用了受影响 DTO 的 service 方法
+        if (method.dataCalls.length > 0) {
+          const responseRefs = this.traceCallsForDto(
+            controllerClass,
+            method,
+            affectedDtos,
+            changedDtos,
+            fieldChangePoints,
+            'response',
+            depth,
+            maxDepth,
+            fieldChanges,
+          );
+          results.push(...responseRefs);
+        }
+      }
     }
 
     // 入参方向：签名类型为黑盒，沿调用链查找参数类型引用了受影响 DTO 的 service 方法
